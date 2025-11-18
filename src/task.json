@@ -1,0 +1,91 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+    "id": "7c8f9a2b-1d3e-4f5a-9b7c-8e2d1f4a6c9b",
+    "name": "OllamaCodeReview",
+    "friendlyName": "Ollama Code Review",
+    "description": "Complete a Code Review using on-premises hosted Ollama",
+    "category": "Utility",
+    "author": "teriansilva",
+    "version": {
+        "Major": 1,
+        "Minor": 0,
+        "Patch": 1
+    },
+    "instanceNameFormat": "Ollama Code Review $(message)",
+    "inputs": [
+        {
+            "name": "ollama_endpoint",
+            "type": "string",
+            "label": "Ollama API Endpoint",
+            "defaultValue": "http://localhost:11434/api/chat",
+            "required": true,
+            "helpMarkDown": "The full URL to your Ollama API endpoint. Supports both HTTP and HTTPS. Example: http://localhost:11434/api/chat or https://ollama.yourdomain.com/api/chat"
+        },
+        {
+            "name": "ai_model",
+            "type": "string",
+            "label": "Ollama Model",
+            "defaultValue": "codellama",
+            "required": true,
+            "helpMarkDown": "## Ollama Model Configuration\n\n### Description\nSpecify the Ollama model to use for code analysis. You can use any model available in your Ollama instance.\n\n### Common Models\n- **codellama** - Meta's Code Llama model optimized for code understanding\n- **llama3.1** - Latest Llama 3.1 model with strong reasoning capabilities\n- **llama3.2** - Llama 3.2 with improved performance\n- **deepseek-coder** - Specialized model for code analysis\n- **qwen2.5-coder** - Qwen's code-focused model\n- **mistral** - Mistral AI's general-purpose model\n- **mixtral** - Mixture of experts model with strong performance\n\n### Custom Models\nYou can enter any custom model name that exists in your Ollama instance. Run `ollama list` on your Ollama server to see available models.\n\n### Default Value\nThe default model is set to **codellama**.\n\nChoose or enter the model name that best suits your code review requirements."
+        },
+        {
+            "name": "bugs",
+            "type": "boolean",
+            "label": "Check for bugs",
+            "defaultValue": true,
+            "helpMarkDown": "Specify whether to enable bug checking during the code review process.\n\n- Set to `true` to perform bug checks.\n- Set to `false` to skip bug checks.\n\nBug checking helps identify and address potential issues in the code. Default value is `true`."
+        },
+        {
+            "name": "performance",
+            "type": "boolean",
+            "label": "Check for performance problems",
+            "defaultValue": true,
+            "helpMarkDown": "Specify whether to include performance checks during the code review process.\n\n- Set to `true` to perform performance checks.\n- Set to `false` to skip performance checks.\n\nEnabling performance checks helps identify and address potential performance-related issues in the code. Default value is `true`."
+        },
+        {
+            "name": "best_practices",
+            "type": "boolean",
+            "label": "Check for missed best practices",
+            "defaultValue": true,
+            "helpMarkDown": "Specify whether to include checks for missed best practices during the code review process.\n\n- Set to `true` to perform best practices checks.\n- Set to `false` to skip best practices checks.\n\nEnabling best practices checks helps ensure adherence to coding standards and identifies areas for improvement. Default value is `true`."
+        },
+        {
+            "name": "file_extensions",
+            "type": "string",
+            "label": "File Extensions",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Specify a comma-separated list of file extensions for which you want to perform a code review. This input helps narrow down the scope of the code review to specific file types.\n\n**Example:**\n```plaintext\n\".js,.ts,.css,.html\"\n```\n\nMake sure to provide the file extensions without spaces after the commas."
+        },
+        {
+            "name": "file_excludes",
+            "type": "string",
+            "label": "Files to exclude",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "## Files to Exclude Configuration\n\n### Description\nSpecify a comma-separated list of file names that should be excluded from code reviews. This is useful for excluding sensitive files or preventing certain files from being reviewed.\n\n### Format\nProvide a list of file names separated by commas. For example: `file1.js, file2.py, secret.txt`\n\n### Default Value\nIf no files are specified, all files will be considered for code review by default."
+        },
+        {
+            "name": "additional_prompts",
+            "type": "string",
+            "label": "Additional Prompts",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Specify additional Open AI prompts as a comma-separated list to enhance the code review process.\n\n- Add multiple prompts separated by commas.\n- These prompts will be used in conjunction with the main code review prompts.\n\n**Example:**\n```plaintext\nFix variable naming, Ensure consistent indentation, Review error handling approach\n```"
+        },
+        {
+            "name": "bearer_token",
+            "type": "string",
+            "label": "Bearer Token (Optional)",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "## Bearer Token Configuration\n\n### Description\nProvide the Bearer token to authenticate with your secured Ollama API endpoint. This token will be sent in the `Authorization: Bearer <token>` header.\n\n**Leave empty if your Ollama endpoint does not require authentication.**\n\n### When to Use\nUse this when your Ollama API is exposed through a reverse proxy (like nginx) that requires Bearer token authentication.\n\n### Security Note\nStore sensitive tokens as pipeline variables or Azure Key Vault secrets rather than hardcoding them.\n\n### Example\nUse `$(OllamaApiToken)` to reference a pipeline variable."
+        }
+    ],
+    "execution": {
+        "Node20_1": {
+            "target": "main.js"
+        }
+    }
+}

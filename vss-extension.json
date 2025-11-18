@@ -1,0 +1,90 @@
+{
+    "manifestVersion": 1,
+    "id": "olcr",
+    "version": "1.0.1",
+    "name": "Ollama Code Reviewer",
+    "publisher": "teriansilva",
+    "public": true,
+    "targets": [
+        {
+            "id": "Microsoft.VisualStudio.Services"
+        }
+    ],
+    "description": "Integrate on-premises hosted Ollama for automated code reviews in Azure DevOps Pull Requests. Enhance code quality and improve review efficiency with self-hosted AI.",
+    "categories": [
+        "Azure Pipelines"
+    ],
+    "tags": [
+        "Code Analysis",
+        "Ollama",
+        "Code Quality",
+        "LLM",
+        "Quality Assurance",
+        "Pull Request",
+        "Pipeline",
+        "Code Inspection",
+        "Peer Review",
+        "Code Review",
+        "AI",
+        "On-Premises",
+        "Self-Hosted"
+    ],
+    "icons": {
+        "default": "assets/logo.png"
+    },
+    "branding": {
+        "color": "rgb(138, 43, 226)",
+        "theme": "dark"
+    },
+    "links": {
+        "support": {
+            "uri": "https://github.com/teriansilva/Ollama-Code-Reviewer/issues",
+            "version": "1.0.1"
+        }
+    },
+    "repository": {
+        "type": "git",
+        "uri": "https://github.com/teriansilva/Ollama-Code-Reviewer"
+    },
+    "screenshots": [
+       
+    ],
+    "content": {
+        "details": {
+            "path": "assets/overview.md"
+        }
+    },
+    "files": [
+        {
+            "path": "src"
+        },
+        {
+            "path": "assets/overview.md",
+            "addressable": true
+        },
+        {
+            "path": "assets/logo.png",
+            "addressable": true
+        },
+        {
+            "path": "assets/screenshot1.png",
+            "addressable": true
+        },
+        {
+            "path": "assets/screenshot2.png",
+            "addressable": true
+        }
+    ],
+    "contributions": [
+        {
+            "id": "custom-build-release-task",
+            "type": "ms.vss-distributed-task.task",
+            "targets": [
+                "ms.vss-distributed-task.tasks"
+            ],
+            "properties": {
+                "name": "src"
+            }
+        }
+    ]
+}

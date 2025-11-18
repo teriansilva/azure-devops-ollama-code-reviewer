@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
+    <script>
+        window.requirejs.config({
+            enforceDefine: true,
+            paths: {
+                'SDK': './lib/SDK.min'
+            }
+        });
+        window.requirejs(['SDK'], function (SDK) {
+            if (typeof SDK !== 'undefined') {
+                console.log("SDK is defined. Trying to initialize...");
+                SDK.init();
+                SDK.ready().then(() => {
+                    console.log("SDK is ready");
+                    document.getElementById("name").innerText = SDK.getUser().displayName;
+                });
+            } else {
+                console.log('SDK is not defined');
+            }
+        });
+    </script>
+    <style>
+        body {
+            background-color: rgb(138, 43, 226);
+            color: white;
+            margin: 20px;
+            padding: 20px;
+            font-family: "Segoe UI VSS (Regular)","-apple-system",BlinkMacSystemFont,"Segoe UI",sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        .info {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        a {
+            color: #fff;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to Ollama Code Review, <span id="name"></span>!</h1>
+        <p>Thank you for installing the Ollama Code Review extension. This extension brings AI-powered code reviews to your Azure DevOps pull requests using self-hosted Ollama models.</p>
+        
+        <div class="info">
+            <h2>Getting Started</h2>
+            <p>Configure the extension in your pipeline YAML to start reviewing code automatically:</p>
+            <ul>
+                <li>Set up your Ollama endpoint</li>
+                <li>Choose your preferred AI model</li>
+                <li>Configure review options (bugs, performance, best practices)</li>
+                <li>Optional: Add Bearer token for secured endpoints</li>
+            </ul>
+            <p>For detailed instructions, visit our <a href="https://github.com/teriansilva/Ollama-Code-Reviewer" target="_blank">GitHub repository</a>.</p>
+        </div>
+    </div>
+</body>
+</html>
