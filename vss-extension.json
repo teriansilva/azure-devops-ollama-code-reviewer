@@ -38,13 +38,13 @@
     },
     "links": {
         "support": {
-            "uri": "https://github.com/teriansilva/Ollama-Code-Reviewer/issues",
+            "uri": "https://github.com/teriansilva/azure-devops-ollama-code-reviewer/issues",
             "version": "1.0.1"
         }
     },
     "repository": {
         "type": "git",
-        "uri": "https://github.com/teriansilva/Ollama-Code-Reviewer"
+        "uri": "https://github.com/teriansilva/azure-devops-ollama-code-reviewer"
     },
     "screenshots": [
        

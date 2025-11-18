@@ -78,15 +78,15 @@ A: Build Administrators must be given "Contribute to pull requests" access. Chec
 
 ### Bug Reports
 
-If you find a bug or unexpected behavior, please [open a bug report](https://github.com/teriansilva/Ollama-Code-Reviewer/issues/new?assignees=&labels=bug&template=bug_report.md&title=).
+If you find a bug or unexpected behavior, please [open a bug report](https://github.com/teriansilva/azure-devops-ollama-code-reviewer/issues/new?assignees=&labels=bug&template=bug_report.md&title=).
 
 ### Feature Requests
 
-If you have ideas for new features or enhancements, please [submit a feature request](https://github.com/teriansilva/Ollama-Code-Reviewer/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=).
+If you have ideas for new features or enhancements, please [submit a feature request](https://github.com/teriansilva/azure-devops-ollama-code-reviewer/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=).
 
 ## Learn More
 
-Visit our [GitHub repository](https://github.com/teriansilva/Ollama-Code-Reviewer) for additional documentation, updates, and support.
+Visit our [GitHub repository](https://github.com/teriansilva/azure-devops-ollama-code-reviewer) for additional documentation, updates, and support.
 
 ## Securing Your Ollama API with nginx
 
