@@ -7,9 +7,9 @@
     "category": "Utility",
     "author": "teriansilva",
     "version": {
-        "Major": 1,
+        "Major": 2,
         "Minor": 0,
-        "Patch": 1
+        "Patch": 0
     },
     "instanceNameFormat": "Ollama Code Review $(message)",
     "inputs": [
@@ -25,9 +25,9 @@
             "name": "ai_model",
             "type": "string",
             "label": "Ollama Model",
-            "defaultValue": "codellama",
+            "defaultValue": "gpt-oss:20b",
             "required": true,
-            "helpMarkDown": "## Ollama Model Configuration\n\n### Description\nSpecify the Ollama model to use for code analysis. You can use any model available in your Ollama instance.\n\n### Common Models\n- **codellama** - Meta's Code Llama model optimized for code understanding\n- **llama3.1** - Latest Llama 3.1 model with strong reasoning capabilities\n- **llama3.2** - Llama 3.2 with improved performance\n- **deepseek-coder** - Specialized model for code analysis\n- **qwen2.5-coder** - Qwen's code-focused model\n- **mistral** - Mistral AI's general-purpose model\n- **mixtral** - Mixture of experts model with strong performance\n\n### Custom Models\nYou can enter any custom model name that exists in your Ollama instance. Run `ollama list` on your Ollama server to see available models.\n\n### Default Value\nThe default model is set to **codellama**.\n\nChoose or enter the model name that best suits your code review requirements."
+            "helpMarkDown": "## Ollama Model Configuration\n\n### Description\nSpecify the Ollama model to use for code analysis. You can use any model available in your Ollama instance.\n\n### Recommended Models for Code Review\n- **gpt-oss** - Excellent for code review with strong reasoning (Highly Recommended)\n- **qwen2.5-coder** - Advanced code analysis and understanding\n- **deepseek-coder-v2** - Latest version optimized for code understanding\n- **codellama** - Meta's Code Llama model (stable and reliable)\n- **llama3.3** - Latest Llama model with improved reasoning\n- **llama3.2** - Llama 3.2 with strong performance\n- **mistral-large** - Large general-purpose model with excellent capabilities\n- **mixtral** - Mixture of experts model with strong performance\n- **codegemma** - Google's code-focused model\n\n### Custom Models\nYou can enter any custom model name that exists in your Ollama instance. Run `ollama list` on your Ollama server to see available models.\n\n### Default Value\nThe default model is set to **codellama** for compatibility.\n\nChoose or enter the model name that best suits your code review requirements."
         },
         {
             "name": "bugs",
@@ -81,6 +81,14 @@
             "defaultValue": "",
             "required": false,
             "helpMarkDown": "## Bearer Token Configuration\n\n### Description\nProvide the Bearer token to authenticate with your secured Ollama API endpoint. This token will be sent in the `Authorization: Bearer <token>` header.\n\n**Leave empty if your Ollama endpoint does not require authentication.**\n\n### When to Use\nUse this when your Ollama API is exposed through a reverse proxy (like nginx) that requires Bearer token authentication.\n\n### Security Note\nStore sensitive tokens as pipeline variables or Azure Key Vault secrets rather than hardcoding them.\n\n### Example\nUse `$(OllamaApiToken)` to reference a pipeline variable."
+        },
+        {
+            "name": "custom_best_practices",
+            "type": "multiLine",
+            "label": "Custom Best Practices",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "## Custom Best Practices Configuration\n\n### Description\nDefine project-specific or team-specific best practices that the AI should check for during code review. This helps enforce your organization's coding standards and conventions.\n\n### Format\nEnter each best practice on a new line or as a paragraph. The AI will use these guidelines when reviewing code.\n\n### Examples\n- Always use async/await instead of .then() for promises\n- All public methods must have JSDoc comments\n- Database queries must use parameterized statements\n- Error messages must be logged with context\n- CSS class names must follow BEM methodology\n\n### Default Value\nIf left empty, only the standard checks (bugs, performance, best practices) will be applied."
         }
     ],
     "execution": {

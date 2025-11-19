@@ -37,11 +37,18 @@ export class Main {
         const fileExtensions = tl.getInput('file_extensions', false);
         const filesToExclude = tl.getInput('file_excludes', false);
         const additionalPrompts = tl.getInput('additional_prompts', false)?.split(',');
+        const customBestPractices = tl.getInput('custom_best_practices', false);
         const bearerToken = tl.getInput('bearer_token', false);
         
         if (bearerToken && bearerToken.trim() !== '') {
             console.log("Using Bearer token authentication for Ollama API");
         }
+        
+        this._repository = new Repository();
+        
+        // Gather project context once at the beginning
+        console.log("Gathering project context...");
+        const projectContext = await this._repository.GetProjectContext();
         
         this._ollama = new Ollama(
             ollamaEndpoint, 
@@ -49,9 +56,10 @@ export class Main {
             tl.getBoolInput('performance', true), 
             tl.getBoolInput('best_practices', true), 
             additionalPrompts,
+            customBestPractices || '',
+            projectContext,
             bearerToken && bearerToken.trim() !== '' ? bearerToken : undefined
         );
-        this._repository = new Repository();
         this._pullRequest = new PullRequest();
 
         await this._pullRequest.DeleteComments();
@@ -63,7 +71,8 @@ export class Main {
         for (let index = 0; index < filesToReview.length; index++) {
             const fileToReview = filesToReview[index];
             let diff = await this._repository.GetDiff(fileToReview);
-            let review = await this._ollama.PerformCodeReview(diff, fileToReview);
+            let fileContent = await this._repository.GetFileContent(fileToReview);
+            let review = await this._ollama.PerformCodeReview(diff, fileToReview, fileContent);
 
             if(review.indexOf('NO_COMMENT') < 0) {
                 await this._pullRequest.AddComment(fileToReview, review);

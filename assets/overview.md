@@ -13,20 +13,41 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
 - **Self-Hosted & Secure:** Keep your code and reviews completely private on your own infrastructure. No data sent to external cloud services.
 - **Automated Code Reviews:** Say goodbye to manual code inspections! Let Ollama analyze your code changes, catching bugs, performance issues, and suggesting best practices.
 - **AI-Powered Insights:** Leverage powerful open-source language models like CodeLlama, Llama 3, DeepSeek Coder, and more to receive insightful comments on your pull requests.
+- **Enhanced Context (v2.0):** The AI receives the full file content, project metadata (README, dependencies), and language-specific project files for more informed reviews.
+- **Custom Best Practices (v2.0):** Define your organization's specific coding standards and have the AI enforce them during reviews.
+- **Multi-Language Support:** Automatic detection and context gathering for JavaScript, TypeScript, Python, C#, Java, and more.
 - **Faster Reviews:** Reduce the time spent on code reviews. Let Ollama handle the routine, allowing your team to focus on impactful work.
 - **Configurable and Customizable:** Tailor the extension to your needs with customizable settings. Choose from various Ollama models, define file exclusions, and more.
 - **Cost-Effective:** No API costs or per-token charges. Run unlimited code reviews on your own hardware.
 
+## What's New in v2.0
+
+🎉 **Enhanced AI Context** - The AI now receives:
+- Complete file content (not just diffs) for better understanding
+- Project metadata: README, package.json, requirements.txt, .csproj, .sln, etc.
+- Language-specific dependency information
+
+🎯 **Custom Best Practices** - Define your own project-specific coding standards:
+- Add team conventions
+- Enforce organizational guidelines
+- Ensure consistency across your codebase
+
+🌐 **Improved Language Support**:
+- JavaScript/TypeScript: package.json analysis
+- Python: requirements.txt parsing
+- C#: .csproj, .sln, and packages.config support
+- Java: pom.xml detection
+
 ## Prerequisites
 
 - A running [Ollama](https://ollama.ai/) instance accessible from your build agents
-- Ollama models installed (e.g., `ollama pull codellama` or `ollama pull llama3.1`)
+- Ollama models installed (e.g., `ollama pull gpt-oss` or `ollama pull qwen2.5-coder`)
 
 ## Getting started
 
 1. **Set up Ollama:**
    - Install Ollama on your server or local machine following the [Ollama installation guide](https://ollama.ai/)
-   - Pull your preferred model: `ollama pull codellama` (or `llama3.1`, `deepseek-coder`, `qwen2.5-coder`, etc.)
+   - Pull your preferred model: `ollama pull gpt-oss` (recommended) or `qwen2.5-coder`, `deepseek-coder-v2`, `codellama`, etc.
    - Ensure Ollama is running and accessible from your Azure DevOps build agents
 
 2. **Install the Ollama Code Review DevOps Extension.**
@@ -52,13 +73,17 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
      - task: OllamaCodeReview@1
        inputs:
          ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
-         ai_model: 'codellama'
+         ai_model: 'gpt-oss'
          bugs: true
          performance: true
          best_practices: true
          file_extensions: 'js,ts,css,html'
          file_excludes: 'file1.js,file2.py,secret.txt'
-         additional_prompts: 'Fix variable naming, Ensure consistent indentation, Review error handling approach'`
+         additional_prompts: 'Fix variable naming, Ensure consistent indentation, Review error handling approach'
+         custom_best_practices: |
+           Always use async/await instead of .then() for promises
+           All public methods must have JSDoc comments
+           Database queries must use parameterized statements`
    
 3. If you do not already have Build Validation configured for your branch already add [Build validation](https://learn.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops&tabs=browser#build-validation) to your branch policy to trigger the code review when a Pull Request is created
 
@@ -143,7 +168,7 @@ Then use the Bearer Token field in the extension configuration to authenticate:
 - task: OllamaCodeReview@1
   inputs:
     ollama_endpoint: 'https://ollama.example.com/api/chat'
-    ai_model: 'codellama'
+    ai_model: 'gpt-oss'
     bearer_token: '$(OllamaApiToken)'  # Store as pipeline variable
 ```
 
@@ -151,10 +176,12 @@ Then use the Bearer Token field in the extension configuration to authenticate:
 
 This extension works with any Ollama model, but these are particularly well-suited for code reviews:
 
-- **codellama** - Meta's specialized code model
-- **llama3.1** / **llama3.2** - General-purpose with strong reasoning
-- **deepseek-coder** - Optimized for code understanding
-- **qwen2.5-coder** - Advanced code analysis
-- **mistral** / **mixtral** - Efficient general-purpose models
+- **gpt-oss** - Excellent for code review with strong reasoning (Recommended)
+- **qwen2.5-coder** - Advanced code analysis and understanding
+- **deepseek-coder-v2** - Latest version optimized for code understanding
+- **codellama** - Meta's specialized code model (stable)
+- **llama3.3** / **llama3.2** - Latest Llama models with improved reasoning
+- **mistral-large** / **mixtral** - Efficient general-purpose models
+- **codegemma** - Google's code-focused model
 
 Run `ollama list` on your Ollama server to see all available models.

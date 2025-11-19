@@ -22,8 +22,7 @@ export class PullRequest {
                 port: urlObj.port || (isHttps ? 443 : 80),
                 path: urlObj.pathname + urlObj.search,
                 method: options.method || 'GET',
-                headers: options.headers || {},
-                rejectUnauthorized: false
+                headers: options.headers || {}
             };
 
             const req = protocol.request(requestOptions, (res) => {

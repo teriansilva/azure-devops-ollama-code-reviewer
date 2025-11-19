@@ -1,6 +1,6 @@
 # Ollama Code Review - Azure DevOps Extension
 
-[![Version](https://img.shields.io/badge/version-1.0.1-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 An Azure DevOps extension that brings AI-powered code reviews to your pull requests using self-hosted Ollama language models. Keep your code secure and private while leveraging powerful AI for automated code analysis.
@@ -12,9 +12,12 @@ An Azure DevOps extension that brings AI-powered code reviews to your pull reque
 - 🐛 **Bug Detection** - Automatically identifies potential bugs
 - ⚡ **Performance Analysis** - Highlights performance issues
 - 📋 **Best Practices** - Suggests improvements and coding standards
+- 🎯 **Custom Best Practices** - Define your own project-specific coding standards
+- 📚 **Rich Context** - Provides AI with full file content and project metadata
 - 🔧 **Highly Configurable** - Customize review criteria and file filters
 - 🔐 **Bearer Token Support** - Secure your API with authentication
 - 💰 **Cost-Effective** - No API costs or per-token charges
+- 🌐 **Multi-Language Support** - JavaScript, TypeScript, Python, C#, Java and more
 
 ## Prerequisites
 
@@ -35,8 +38,9 @@ An Azure DevOps extension that brings AI-powered code reviews to your pull reque
 # Install Ollama
 curl https://ollama.ai/install.sh | sh
 
-# Pull a model
-ollama pull codellama
+# Pull a recommended model
+ollama pull gpt-oss
+# Or use another model like qwen2.5-coder, deepseek-coder-v2, or codellama
 ```
 
 ### 2. Add to Your Pipeline
@@ -61,13 +65,17 @@ jobs:
     displayName: 'AI Code Review'
     inputs:
       ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
-      ai_model: 'codellama'
+      ai_model: 'gpt-oss'
       bugs: true
       performance: true
       best_practices: true
       file_extensions: '.js,.ts,.py,.cs'
       file_excludes: 'package-lock.json,*.min.js'
       additional_prompts: 'Check for security vulnerabilities, Verify error handling'
+      custom_best_practices: |
+        Always use async/await instead of .then() for promises
+        All public methods must have JSDoc comments
+        Database queries must use parameterized statements
 ```
 
 ### 3. Configure Build Validation
@@ -86,6 +94,7 @@ Add [Build validation](https://learn.microsoft.com/en-us/azure/devops/repos/git/
 | `file_extensions` | string | No | Comma-separated list of file extensions to review |
 | `file_excludes` | string | No | Comma-separated list of files to exclude |
 | `additional_prompts` | string | No | Custom review instructions |
+| `custom_best_practices` | multiLine | No | Project-specific best practices (one per line) |
 | `bearer_token` | string | No | Bearer token for authenticated endpoints |
 
 ## Securing Your Ollama API
@@ -122,19 +131,52 @@ Then use the Bearer token in your pipeline:
 - task: OllamaCodeReview@1
   inputs:
     ollama_endpoint: 'https://ollama.example.com/api/chat'
-    ai_model: 'codellama'
+    ai_model: 'gpt-oss'
     bearer_token: '$(OllamaApiToken)'  # Store as pipeline variable
 ```
+
+## Enhanced Context for Better Reviews
+
+**Version 2.0** provides significantly more context to the AI model:
+
+- **Full File Content** - The AI sees the complete file being changed, not just the diff
+- **Project Metadata** - Automatically includes README, package.json, requirements.txt, .csproj files, and more
+- **Language-Specific Context** - Detects and includes relevant project files:
+  - **JavaScript/TypeScript**: package.json with dependencies
+  - **Python**: requirements.txt
+  - **C#**: .csproj files, .sln solution files, packages.config
+  - **Java**: pom.xml detection
+
+This comprehensive context allows the AI to make more informed suggestions based on your project's actual structure, dependencies, and conventions.
+
+## Custom Best Practices
+
+Define your organization's or team's specific coding standards:
+
+```yaml
+- task: OllamaCodeReview@1
+  inputs:
+    custom_best_practices: |
+      Always use async/await instead of .then() for promises
+      All public methods must have JSDoc comments
+      Database queries must use parameterized statements
+      Error messages must be logged with context
+      CSS class names must follow BEM methodology
+```
+
+The AI will check for these practices in addition to standard bug detection and performance analysis.
 
 ## Supported Models
 
 The extension works with any Ollama model, but these are particularly well-suited for code reviews:
 
-- **codellama** - Meta's specialized code model
-- **llama3.1** / **llama3.2** - General-purpose with strong reasoning
-- **deepseek-coder** - Optimized for code understanding
-- **qwen2.5-coder** - Advanced code analysis
-- **mistral** / **mixtral** - Efficient general-purpose models
+- **gpt-oss** - Excellent for code review with strong reasoning (Recommended)
+- **qwen2.5-coder** - Advanced code analysis and understanding
+- **deepseek-coder-v2** - Latest version optimized for code understanding
+- **codellama** - Meta's specialized code model (stable)
+- **llama3.3** / **llama3.2** - Latest Llama models with improved reasoning
+- **mistral-large** / **mixtral** - Efficient general-purpose models
+- **codegemma** - Google's code-focused model
 
 Run `ollama list` to see all available models on your server.
 

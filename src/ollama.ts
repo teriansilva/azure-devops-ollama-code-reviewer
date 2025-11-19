@@ -27,6 +27,7 @@ export class Ollama {
     private readonly ollamaEndpoint: string;
     private readonly useHttps: boolean;
     private readonly bearerToken?: string;
+    private readonly projectContext: string = '';
 
     constructor(
         ollamaEndpoint: string,
@@ -34,33 +35,62 @@ export class Ollama {
         checkForPerformance: boolean = false,
         checkForBestPractices: boolean = false,
         additionalPrompts: string[] = [],
+        customBestPractices: string = '',
+        projectContext: string = '',
         bearerToken?: string
     ) {
         this.ollamaEndpoint = ollamaEndpoint;
         this.useHttps = ollamaEndpoint.startsWith('https://');
         this.bearerToken = bearerToken;
+        this.projectContext = projectContext;
+        
+        // Parse custom best practices into array
+        const customPracticesArray = customBestPractices 
+            ? customBestPractices.split('\n').filter(line => line.trim().length > 0).map(line => line.trim())
+            : [];
         
         this.systemMessage = `Your task is to act as a code reviewer of a Pull Request:
         - Use bullet points if you have multiple comments.
         ${checkForBugs ? '- If there are any bugs, highlight them.' : ''}
         ${checkForPerformance ? '- If there are major performance problems, highlight them.' : ''}
         ${checkForBestPractices ? '- Provide details on missed use of best-practices.' : ''}
-        ${additionalPrompts.length > 0 ? additionalPrompts.map(str => `- ${str}`).join('\n') : ''}
+        ${additionalPrompts.length > 0 ? additionalPrompts.map(str => `- ${str}`).join('\n        ') : ''}
+        ${customPracticesArray.length > 0 ? `\n        Additionally, check for the following project-specific best practices:\n        ${customPracticesArray.map(str => `- ${str}`).join('\n        ')}` : ''}
         - Do not highlight minor issues and nitpicks.
         - Only provide instructions for improvements 
         - If you have no instructions respond with NO_COMMENT only, otherwise provide your instructions.
     
-        You are provided with the code changes (diffs) in a unidiff format.
+        You will be provided with:
+        1. The complete file content (for full context)
+        2. The code changes (diffs) in unidiff format
+        3. Project metadata (README, dependencies, etc.)
+        
+        Focus your review on the changes shown in the diff, but use the full file content and project context to understand the bigger picture.
         
         The response should be in markdown format.`;
     }
 
-    public async PerformCodeReview(diff: string, fileName: string): Promise<string> {
+    public async PerformCodeReview(diff: string, fileName: string, fileContent: string = ''): Promise<string> {
         const model = tl.getInput('ai_model', true)!;
 
-        if (!this.doesMessageExceedTokenLimit(diff + this.systemMessage, 8192)) {
+        // Construct the full context message
+        let contextMessage = '';
+        
+        if (this.projectContext) {
+            contextMessage += `${this.projectContext}\n\n`;
+        }
+        
+        if (fileContent) {
+            contextMessage += `## Full File Content (${fileName}):\n\`\`\`\n${fileContent}\n\`\`\`\n\n`;
+        }
+        
+        contextMessage += `## Changes (Diff):\n\`\`\`diff\n${diff}\n\`\`\`\n\n`;
+        contextMessage += `Please review the changes in the diff above, using the full file content and project context for reference.`;
+
+        // Check token limit with full context
+        if (!this.doesMessageExceedTokenLimit(contextMessage + this.systemMessage, 8192)) {
             try {
-                const response = await this.callOllamaApi(model, diff);
+                const response = await this.callOllamaApi(model, contextMessage);
                 
                 if (response && response.message && response.message.content) {
                     return response.message.content;
@@ -69,9 +99,25 @@ export class Ollama {
                 tl.error(`Error calling Ollama API for file ${fileName}: ${error}`);
                 return '';
             }
+        } else {
+            // If full context exceeds limits, try with just diff
+            tl.warning(`Full context for ${fileName} exceeds token limits. Attempting review with diff only.`);
+            
+            if (!this.doesMessageExceedTokenLimit(diff + this.systemMessage, 8192)) {
+                try {
+                    const response = await this.callOllamaApi(model, diff);
+                    
+                    if (response && response.message && response.message.content) {
+                        return response.message.content;
+                    }
+                } catch (error) {
+                    tl.error(`Error calling Ollama API for file ${fileName}: ${error}`);
+                    return '';
+                }
+            }
         }
 
-        tl.warning(`Unable to process diff for file ${fileName} as it exceeds token limits.`);
+        tl.warning(`Unable to process file ${fileName} as it exceeds token limits even with diff only.`);
         return '';
     }
 
