@@ -50,6 +50,40 @@ export class Main {
         console.log("Gathering project context...");
         const projectContext = await this._repository.GetProjectContext();
         
+        // Gather build log context if enabled
+        let buildLogContext = '';
+        const includeBuildLogs = tl.getBoolInput('include_build_logs', false);
+        if (includeBuildLogs) {
+            console.log("Gathering build log context...");
+            const buildLogTaskFilter = tl.getInput('build_log_tasks', false) || '';
+            buildLogContext = await this._repository.GetBuildLogContext(500, buildLogTaskFilter);
+            if (buildLogContext) {
+                console.log("Build log context gathered successfully.");
+            }
+        }
+        
+        // Combine project context with build log context
+        let fullContext = projectContext + buildLogContext;
+        
+        // Initialize PullRequest early to gather PR comments if enabled
+        this._pullRequest = new PullRequest();
+        
+        // Gather existing PR comments if enabled
+        const includePRComments = tl.getBoolInput('include_pr_comments', false);
+        if (includePRComments) {
+            console.log("Gathering existing PR comments...");
+            const prCommentsContext = await this._pullRequest.GetPRCommentsContext();
+            if (prCommentsContext) {
+                fullContext += prCommentsContext;
+                console.log("PR comments context gathered successfully.");
+            } else {
+                console.log("No existing PR comments found.");
+            }
+        }
+        
+        // Get custom system prompt if provided
+        const customSystemPrompt = tl.getInput('custom_system_prompt', false);
+        
         this._ollama = new Ollama(
             ollamaEndpoint, 
             tl.getBoolInput('bugs', true), 
@@ -57,10 +91,10 @@ export class Main {
             tl.getBoolInput('best_practices', true), 
             additionalPrompts,
             customBestPractices || '',
-            projectContext,
-            bearerToken && bearerToken.trim() !== '' ? bearerToken : undefined
+            fullContext,
+            bearerToken && bearerToken.trim() !== '' ? bearerToken : undefined,
+            customSystemPrompt
         );
-        this._pullRequest = new PullRequest();
 
         await this._pullRequest.DeleteComments();
 
@@ -72,10 +106,17 @@ export class Main {
             const fileToReview = filesToReview[index];
             let diff = await this._repository.GetDiff(fileToReview);
             let fileContent = await this._repository.GetFileContent(fileToReview);
-            let review = await this._ollama.PerformCodeReview(diff, fileToReview, fileContent);
+            let reviewComments = await this._ollama.PerformCodeReview(diff, fileToReview, fileContent);
 
-            if(review.indexOf('NO_COMMENT') < 0) {
-                await this._pullRequest.AddComment(fileToReview, review);
+            // Add each comment at its specific line
+            for (const reviewComment of reviewComments) {
+                await this._pullRequest.AddComment(fileToReview, reviewComment.comment, reviewComment.lineNumber);
+            }
+            
+            if (reviewComments.length > 0) {
+                console.info(`Added ${reviewComments.length} comment(s) to ${fileToReview}`);
+            } else {
+                console.info(`No comments for ${fileToReview}`);
             }
 
             console.info(`Completed review of file ${fileToReview}`)
