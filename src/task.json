@@ -9,7 +9,7 @@
     "version": {
         "Major": 2,
         "Minor": 4,
-        "Patch": 6
+        "Patch": 7
     },
     "instanceNameFormat": "Ollama Code Review $(message)",
     "inputs": [

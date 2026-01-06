@@ -1,7 +1,8 @@
 # Ollama Code Review - Azure DevOps Extension
 
-[![Version](https://img.shields.io/badge/version-2.4.6-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
+[![Version](https://img.shields.io/badge/version-2.4.7-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support-yellow?logo=buy-me-a-coffee)](https://buymeacoffee.com/teriansilva)
 
 An Azure DevOps extension that brings AI-powered code reviews to your pull requests using self-hosted Ollama language models. Keep your code secure and private while leveraging powerful AI for automated code analysis.
 
@@ -491,12 +492,17 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - 🐛 [Report a Bug](https://github.com/teriansilva/azure-devops-ollama-code-reviewer/issues/new?labels=bug)
 - 💡 [Request a Feature](https://github.com/teriansilva/azure-devops-ollama-code-reviewer/issues/new?labels=enhancement)
 - 📖 [Documentation](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
+- ☕ [Buy Me a Coffee](https://buymeacoffee.com/teriansilva)
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Version History
+
+### v2.4.7
+- 📝 **Documentation** - Updated marketplace overview with all v2.1-2.4 features
+- ☕ **Support** - Added Buy Me a Coffee link
 
 ### v2.4.6
 - 🐛 **Bug Fixes** - Improved response handling and logging
