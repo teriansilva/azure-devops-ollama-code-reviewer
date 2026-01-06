@@ -1,6 +1,6 @@
 # Ollama Code Review - Azure DevOps Extension
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
+[![Version](https://img.shields.io/badge/version-2.4.6-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 An Azure DevOps extension that brings AI-powered code reviews to your pull requests using self-hosted Ollama language models. Keep your code secure and private while leveraging powerful AI for automated code analysis.
@@ -9,11 +9,16 @@ An Azure DevOps extension that brings AI-powered code reviews to your pull reque
 
 - 🔒 **Self-Hosted & Secure** - Run entirely on your own infrastructure
 - 🤖 **AI-Powered Reviews** - Leverages Ollama's powerful language models
+- � **OpenAI Compatible** - Works with both Ollama native and OpenAI-compatible APIs
+- �📍 **Line-Specific Comments** - Comments appear directly on the relevant code lines
 - 🐛 **Bug Detection** - Automatically identifies potential bugs
 - ⚡ **Performance Analysis** - Highlights performance issues
 - 📋 **Best Practices** - Suggests improvements and coding standards
 - 🎯 **Custom Best Practices** - Define your own project-specific coding standards
-- 📚 **Rich Context** - Provides AI with full file content and project metadata
+- 📚 **Rich Context** - Provides AI with original file content and project metadata
+- 🏗️ **Build Log Context** - Include pipeline build logs for comprehensive analysis
+- 🎯 **Build Log Filtering** - Filter which tasks to include in build logs
+- 💬 **PR Comments Awareness** - AI sees existing comments to avoid duplicates
 - 🔧 **Highly Configurable** - Customize review criteria and file filters
 - 🔐 **Bearer Token Support** - Secure your API with authentication
 - 💰 **Cost-Effective** - No API costs or per-token charges
@@ -24,6 +29,45 @@ An Azure DevOps extension that brings AI-powered code reviews to your pull reque
 - A running [Ollama](https://ollama.ai/) instance accessible from your Azure DevOps build agents
 - Ollama models installed (e.g., `codellama`, `llama3.1`, `deepseek-coder`)
 - Azure DevOps pipeline with OAuth token access enabled
+
+## ⚠️ Required Permissions Setup
+
+Before using this extension, you **must** configure the following permissions:
+
+### 1. Enable OAuth Token Access
+
+In your pipeline YAML, enable script access to the OAuth token:
+
+```yaml
+jobs:
+- job: CodeReview
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+  - checkout: self
+    persistCredentials: true
+  - task: OllamaCodeReview@2
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+```
+
+Or enable it in the classic editor: **Agent job** → **Additional options** → ✅ **Allow scripts to access the OAuth token**
+
+### 2. Grant Build Service Permissions
+
+The Build Service account needs permission to comment on pull requests:
+
+1. Go to **Project Settings** → **Repositories**
+2. Select your repository
+3. Click the **Security** tab
+4. Find your Build Service account:
+   - For project-scoped: `[Project Name] Build Service ([Organization])`
+   - For collection-scoped: `Project Collection Build Service ([Organization])`
+5. Set **"Contribute to pull requests"** to **Allow**
+
+> **Note:** If you see a `403 Forbidden` error, this permission is missing.
+
+For detailed instructions, see [this Stack Overflow guide](https://stackoverflow.com/a/57985733).
 
 ## Installation
 
@@ -61,7 +105,7 @@ jobs:
   pool:
     vmImage: 'ubuntu-latest'
   steps:
-  - task: OllamaCodeReview@1
+  - task: OllamaCodeReview@2
     displayName: 'AI Code Review'
     inputs:
       ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
@@ -96,6 +140,13 @@ Add [Build validation](https://learn.microsoft.com/en-us/azure/devops/repos/git/
 | `additional_prompts` | string | No | Custom review instructions |
 | `custom_best_practices` | multiLine | No | Project-specific best practices (one per line) |
 | `bearer_token` | string | No | Bearer token for authenticated endpoints |
+| `include_build_logs` | boolean | No | Include build log context from previous pipeline steps (default: `false`) |
+| `build_log_tasks` | string | No | Comma-separated task names to filter build logs (default: all tasks) |
+| `include_pr_comments` | boolean | No | Include existing PR comments to avoid duplicates (default: `false`) |
+| `token_limit` | string | No | Maximum tokens per request (default: `8192`) |
+| `max_file_content_tokens` | string | No | Max tokens for file content (default: `4000`) |
+| `max_project_context_tokens` | string | No | Max tokens for project context (default: `2000`) |
+| `custom_system_prompt` | multiLine | No | Override the default AI system prompt (advanced) |
 
 ## Securing Your Ollama API
 
@@ -128,7 +179,7 @@ server {
 Then use the Bearer token in your pipeline:
 
 ```yaml
-- task: OllamaCodeReview@1
+- task: OllamaCodeReview@2
   inputs:
     ollama_endpoint: 'https://ollama.example.com/api/chat'
     ai_model: 'gpt-oss'
@@ -137,9 +188,10 @@ Then use the Bearer token in your pipeline:
 
 ## Enhanced Context for Better Reviews
 
-**Version 2.0** provides significantly more context to the AI model:
+**Version 2.0+** provides comprehensive context to the AI model:
 
-- **Full File Content** - The AI sees the complete file being changed, not just the diff
+- **Full File Content** - The AI sees the complete current file (after changes)
+- **Code Diff** - Shows exactly what was added and removed
 - **Project Metadata** - Automatically includes README, package.json, requirements.txt, .csproj files, and more
 - **Language-Specific Context** - Detects and includes relevant project files:
   - **JavaScript/TypeScript**: package.json with dependencies
@@ -149,12 +201,200 @@ Then use the Bearer token in your pipeline:
 
 This comprehensive context allows the AI to make more informed suggestions based on your project's actual structure, dependencies, and conventions.
 
+## Build Log Context
+
+**New in v2.1**: Enable build log context to give the AI visibility into your pipeline execution:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
+    ai_model: 'gpt-oss'
+    include_build_logs: true
+```
+
+When enabled, the AI receives:
+- **Build status** - Whether previous steps passed or failed
+- **Compilation output** - Errors and warnings from build steps
+- **Test results** - Output from test execution steps
+- **Build metadata** - Build number, source branch, and definition name
+
+### Filtering Build Log Tasks (v2.4)
+
+Filter which tasks to include in build logs to reduce token usage and focus on relevant output:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
+    ai_model: 'gpt-oss'
+    include_build_logs: true
+    build_log_tasks: 'Build,Test,DotNetCoreCLI'  # Only include matching tasks
+```
+
+Examples:
+- `Build,Test` - Include only Build and Test tasks
+- `DotNetCoreCLI,VSTest` - Include .NET build and test output
+- `npm,webpack` - Include npm and webpack task output
+- Leave empty to include all tasks
+
+This helps the AI understand if the project builds successfully and identify if code changes might relate to any build issues.
+
+## PR Comments Awareness
+
+**New in v2.1**: The AI can see existing PR comments to provide more relevant feedback:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
+    ai_model: 'gpt-oss'
+    include_pr_comments: true
+```
+
+When enabled:
+- **Human reviewer comments** are shown to the AI to avoid duplicating their feedback
+- **Previous AI comments** are marked as `[AI - Previous Review]` so the model recognizes its own prior comments
+- **No duplicate comments** - The AI is instructed not to repeat points already made
+- **Thread status** - Shows whether comments are Active, Fixed, Closed, etc.
+
+This is especially useful when running the code review multiple times on the same PR, ensuring the AI provides fresh insights each time.
+
+## Line-Specific Comments
+
+**New in v2.1**: Comments now appear directly on the specific lines of code they reference:
+
+- Each comment is posted as a separate thread at the exact line in the PR diff
+- Makes it easier for reviewers to understand the context
+- Comments are positioned on the new/modified lines from the changes
+- Multiple comments per file are supported
+
+## Token Limit Configuration
+
+**New in v2.2**: Configure the maximum token limit based on your model's context window:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
+    ai_model: 'qwen2.5-coder:32k'
+    token_limit: '32768'
+```
+
+### How It Works
+
+1. The task calculates the total tokens needed (system prompt + file content + diff + project context)
+2. If the total exceeds `token_limit`, it falls back to reviewing with just the diff
+3. If even the diff exceeds the limit, the file is skipped with a warning
+
+### Recommended Token Limits by Model
+
+| Model | Recommended Token Limit | Context Window |
+|-------|------------------------|----------------|
+| `codellama` | `8192` | 8K |
+| `codellama:13b` | `16384` | 16K |
+| `codellama:34b` | `16384` | 16K |
+| `llama3.2` | `131072` | 128K |
+| `llama3.3` | `131072` | 128K |
+| `qwen2.5-coder` | `32768` | 32K |
+| `qwen2.5-coder:32k` | `32768` | 32K |
+| `qwen2.5-coder:7b` | `131072` | 128K |
+| `deepseek-coder-v2` | `131072` | 128K |
+| `deepseek-coder-v2:16b` | `131072` | 128K |
+| `mistral` | `32768` | 32K |
+| `mistral-large` | `131072` | 128K |
+| `mixtral` | `32768` | 32K |
+| `codegemma` | `8192` | 8K |
+| `gpt-oss` | `32768` | 32K |
+| `gpt-oss:7b` | `32768` | 32K |
+| `gpt-oss:13b` | `32768` | 32K |
+| `gpt-oss:20b` | `32768` | 32K |
+| `gpt-oss:70b` | `131072` | 128K |
+
+### Tips
+
+- **Start conservative**: If unsure, use the default `8192` and increase if you see "exceeds token limit" warnings
+- **Match your model**: Check your model's actual context window with `ollama show <model>`
+- **Large files**: For projects with large files, use models with bigger context windows
+- **Leave headroom**: Set the limit slightly below the model's maximum to account for response tokens
+
+## Context Token Management
+
+**New in v2.3**: Fine-tune how much context is sent to the AI:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
+    ai_model: 'qwen2.5-coder'
+    token_limit: '32768'
+    max_file_content_tokens: '8000'      # More file context
+    max_project_context_tokens: '2000'   # Less project metadata
+```
+
+### Token Breakdown Logging
+
+The task now logs detailed token counts for each file:
+
+```
+Token breakdown for src/components/MyComponent.vue:
+  - System Message: 450 tokens
+  - Context Message: 5200 tokens
+    (includes project context, file content, diff)
+  - Diff only: 320 tokens
+  - Total: 5650 tokens (limit: 32768)
+Proceeding with full context review for src/components/MyComponent.vue
+```
+
+This helps you:
+- Understand where tokens are being used
+- Optimize your configuration for your specific codebase
+- Debug "exceeds token limit" warnings
+
+### Recommended Context Limits
+
+| Scenario | `max_file_content_tokens` | `max_project_context_tokens` |
+|----------|---------------------------|------------------------------|
+| Small context window (8K) | `2000` | `1000` |
+| Medium context window (32K) | `8000` | `2000` |
+| Large context window (128K) | `20000` | `4000` |
+| Diff-only mode | `0` | `0` |
+
+## Custom System Prompt
+
+**New in v2.3**: Override the default AI instructions with your own system prompt:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
+    ai_model: 'qwen2.5-coder'
+    custom_system_prompt: |
+      You are a senior security engineer reviewing code for vulnerabilities.
+      Focus ONLY on security issues: SQL injection, XSS, CSRF, auth bypasses.
+      
+      Respond with valid JSON:
+      {
+        "comments": [
+          {"lineNumber": <number>, "comment": "<security issue description>"}
+        ]
+      }
+      
+      If no security issues found, respond: {"comments": []}
+```
+
+### Important Notes
+
+- **JSON format required**: Your custom prompt MUST instruct the AI to respond with the JSON format shown above, or comments won't be posted
+- **Complete override**: The custom prompt replaces the entire default system message
+- **Use cases**: Security-focused reviews, domain-specific checks, different languages, custom output styles
+
 ## Custom Best Practices
 
 Define your organization's or team's specific coding standards:
 
 ```yaml
-- task: OllamaCodeReview@1
+- task: OllamaCodeReview@2
   inputs:
     custom_best_practices: |
       Always use async/await instead of .then() for promises
@@ -255,6 +495,52 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Version History
+
+### v2.4.6
+- 🐛 **Bug Fixes** - Improved response handling and logging
+
+### v2.4.5
+- 🔄 **OpenAI-Compatible API Support** - Now works with OpenAI-compatible endpoints (e.g., vLLM, text-generation-inference, LiteLLM)
+- 📡 **Dual Response Format** - Automatically detects and handles both Ollama native (`message.content`) and OpenAI (`choices[0].message.content`) response formats
+
+### v2.4.0
+- 🎯 **Build Log Task Filter** - New `build_log_tasks` parameter to filter which pipeline tasks to include in build logs
+- 📊 **Improved Log Names** - Build logs now show actual task names instead of log IDs
+
+### v2.3.0
+- 📊 **Detailed Token Logging** - See exact token counts for each component (system message, context, diff) in pipeline logs
+- ⚙️ **Configurable Context Limits** - Control token allocation with `max_file_content_tokens` and `max_project_context_tokens`
+- 📝 **Custom System Prompt** - Override the default AI instructions with your own system prompt
+- 🔧 **Smart Truncation** - Large files and context are automatically truncated to fit within limits
+- 📉 **Better Diagnostics** - Clear breakdown of token usage to help optimize configuration
+
+### v2.2.0
+- ⚙️ **Configurable Token Limit** - Set the maximum token limit based on your model's context window
+- 📏 **Model-Specific Recommendations** - Documentation for recommended token limits per model
+- 🔧 **Better Error Messages** - Token limit warnings now show the configured limit value
+
+### v2.1.0
+- 📍 **Line-Specific Comments** - Comments now appear directly on the relevant code lines instead of at the top of the file
+- 🏗️ **Build Log Context** - Optionally include pipeline build logs to give AI visibility into build status, compilation errors, and test results
+- 💬 **PR Comments Awareness** - AI can see existing human and AI comments to avoid duplicating feedback
+- 🔄 **Duplicate Prevention** - Previous AI comments are marked and recognized to prevent repeating the same points
+- 📊 **Structured Output** - AI now returns structured JSON for more reliable comment placement
+
+### v2.0.0
+- 🎉 **Enhanced AI Context** - AI now receives complete file content instead of just diffs
+- 📚 **Project Metadata** - Automatically includes README, package.json, requirements.txt, .csproj, and more
+- 🎯 **Custom Best Practices** - Define your own project-specific coding standards
+- 🌐 **Improved Language Support** - Better detection for JavaScript, TypeScript, Python, C#, and Java projects
+- 🔐 **Bearer Token Support** - Secure your Ollama API with authentication
+
+### v1.0.0
+- Initial release
+- Basic AI-powered code review functionality
+- Support for bug detection, performance analysis, and best practices
+- File extension filtering and exclusions
+- Multi-language support
 
 ## Acknowledgments
 

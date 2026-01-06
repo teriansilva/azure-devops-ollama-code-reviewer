@@ -8,8 +8,8 @@
     "author": "teriansilva",
     "version": {
         "Major": 2,
-        "Minor": 0,
-        "Patch": 0
+        "Minor": 4,
+        "Patch": 6
     },
     "instanceNameFormat": "Ollama Code Review $(message)",
     "inputs": [
@@ -89,6 +89,62 @@
             "defaultValue": "",
             "required": false,
             "helpMarkDown": "## Custom Best Practices Configuration\n\n### Description\nDefine project-specific or team-specific best practices that the AI should check for during code review. This helps enforce your organization's coding standards and conventions.\n\n### Format\nEnter each best practice on a new line or as a paragraph. The AI will use these guidelines when reviewing code.\n\n### Examples\n- Always use async/await instead of .then() for promises\n- All public methods must have JSDoc comments\n- Database queries must use parameterized statements\n- Error messages must be logged with context\n- CSS class names must follow BEM methodology\n\n### Default Value\nIf left empty, only the standard checks (bugs, performance, best practices) will be applied."
+        },
+        {
+            "name": "include_build_logs",
+            "type": "boolean",
+            "label": "Include Build Log Context",
+            "defaultValue": false,
+            "required": false,
+            "helpMarkDown": "## Include Build Log Context\n\n### Description\nWhen enabled, the AI model will receive context from the build logs of previous pipeline steps. This helps the model understand:\n\n- Whether the project builds successfully\n- Any compilation errors or warnings\n- Test results from previous steps\n- Other relevant build output\n\n### Use Cases\n- When you want the AI to consider build context in its review\n- To help identify if code changes might cause build issues\n- To provide context about the project's build health\n\n### Performance Note\nEnabling this option may increase the token count sent to the model. Build logs are truncated to prevent exceeding token limits.\n\n### Default Value\nDisabled by default to optimize performance."
+        },
+        {
+            "name": "build_log_tasks",
+            "type": "string",
+            "label": "Build Log Task Filter",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "## Build Log Task Filter\n\n### Description\nSpecify which pipeline tasks to include when gathering build logs. Only logs from matching tasks will be included.\n\n### Format\nComma-separated list of task display names (partial matches supported). Leave empty to include all tasks.\n\n### Examples\n- `Build,Test` - Include only logs from tasks containing 'Build' or 'Test'\n- `DotNetCoreCLI,VSTest` - Include .NET build and test task logs\n- `npm,webpack` - Include npm and webpack task logs\n\n### Default Value\nEmpty (include all task logs)"
+        },
+        {
+            "name": "include_pr_comments",
+            "type": "boolean",
+            "label": "Include Existing PR Comments",
+            "defaultValue": false,
+            "required": false,
+            "helpMarkDown": "## Include Existing PR Comments\n\n### Description\nWhen enabled, the AI model will receive context from existing human-written comments on the Pull Request. This helps the model:\n\n- Understand ongoing discussions about the code\n- Avoid duplicating points already raised by reviewers\n- Provide more contextually relevant feedback\n- Build upon existing review conversations\n\n### What's Included\n- Comments from human reviewers (not AI-generated comments)\n- File-specific and general PR comments\n- Thread status (Active, Fixed, Closed, etc.)\n\n### What's Excluded\n- AI-generated comments from previous runs (to avoid feedback loops)\n- Deleted comments\n- System-generated messages\n\n### Performance Note\nEnabling this option may increase the token count sent to the model.\n\n### Default Value\nDisabled by default to optimize performance."
+        },
+        {
+            "name": "token_limit",
+            "type": "string",
+            "label": "Token Limit",
+            "defaultValue": "8192",
+            "required": false,
+            "helpMarkDown": "## Token Limit Configuration\n\n### Description\nSpecify the maximum number of tokens that can be sent to the AI model in a single request. This limit includes the system prompt, file content, diff, and project context.\n\n### How It Works\n- If the full context (file + diff + project metadata) exceeds this limit, the task will attempt to review with just the diff\n- If even the diff exceeds this limit, the file will be skipped with a warning\n\n### Recommended Values\n- **8192** - Default, works well for most models\n- **16384** - For models with larger context windows (e.g., llama3.2)\n- **32768** - For models with very large context windows (e.g., qwen2.5-coder:32k)\n- **65536** - For models with extended context (e.g., deepseek-coder-v2)\n- **131072** - For models with 128k context windows\n\n### Note\nSet this value based on your model's actual context window size. Setting it too high for a model with a smaller context window will result in API errors.\n\n### Default Value\n8192 tokens (conservative default for broad compatibility)"
+        },
+        {
+            "name": "max_file_content_tokens",
+            "type": "string",
+            "label": "Max File Content Tokens",
+            "defaultValue": "4000",
+            "required": false,
+            "helpMarkDown": "## Max File Content Tokens\n\n### Description\nMaximum number of tokens to include from the full file content. If a file exceeds this limit, only the first portion will be included, and the AI will rely more on the diff.\n\n### Recommended Values\n- **2000** - Conservative, leaves more room for diff and context\n- **4000** - Default, good balance\n- **8000** - For larger context windows\n- **0** - Disable full file content entirely (diff-only mode)\n\n### Default Value\n4000 tokens"
+        },
+        {
+            "name": "max_project_context_tokens",
+            "type": "string",
+            "label": "Max Project Context Tokens",
+            "defaultValue": "2000",
+            "required": false,
+            "helpMarkDown": "## Max Project Context Tokens\n\n### Description\nMaximum number of tokens to include from project context (README, package.json, .csproj files, etc.). If project context exceeds this limit, it will be truncated.\n\n### Recommended Values\n- **1000** - Minimal context\n- **2000** - Default, includes key project info\n- **4000** - More detailed project context\n- **0** - Disable project context entirely\n\n### Default Value\n2000 tokens"
+        },
+        {
+            "name": "custom_system_prompt",
+            "type": "multiLine",
+            "label": "Custom System Prompt (Advanced)",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "## Custom System Prompt\n\n### Description\nCompletely override the default system prompt with your own instructions. This is an advanced option for users who want full control over how the AI behaves.\n\n### Warning\n**If you provide a custom system prompt, you MUST include instructions for the AI to respond in the correct JSON format**, otherwise comments will not be posted correctly.\n\n### Required JSON Format\nYour prompt must instruct the AI to respond with:\n```json\n{\n  \"comments\": [\n    {\n      \"lineNumber\": <number>,\n      \"comment\": \"<string>\"\n    }\n  ]\n}\n```\n\n### Default Value\nEmpty (uses the built-in system prompt)"
         }
     ],
     "execution": {
