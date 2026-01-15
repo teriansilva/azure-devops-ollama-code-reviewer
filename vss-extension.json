@@ -1,7 +1,7 @@
 {
     "manifestVersion": 1,
     "id": "olcr",
-    "version": "2.0.0",
+    "version": "2.8.5",
     "name": "Ollama Code Reviewer",
     "publisher": "teriansilva",
     "public": true,

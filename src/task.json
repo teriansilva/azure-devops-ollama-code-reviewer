@@ -3,92 +3,233 @@
     "id": "7c8f9a2b-1d3e-4f5a-9b7c-8e2d1f4a6c9b",
     "name": "OllamaCodeReview",
     "friendlyName": "Ollama Code Review",
-    "description": "Complete a Code Review using on-premises hosted Ollama",
+    "description": "AI-powered code review using self-hosted Ollama with multi-pass verification workflow",
     "category": "Utility",
     "author": "teriansilva",
     "version": {
         "Major": 2,
-        "Minor": 0,
-        "Patch": 0
+        "Minor": 8,
+        "Patch": 5
     },
-    "instanceNameFormat": "Ollama Code Review $(message)",
+    "instanceNameFormat": "Ollama Code Review",
+    "groups": [
+        {
+            "name": "connection",
+            "displayName": "Connection",
+            "isExpanded": true
+        },
+        {
+            "name": "review",
+            "displayName": "Review Options",
+            "isExpanded": true
+        },
+        {
+            "name": "files",
+            "displayName": "File Filters",
+            "isExpanded": false
+        },
+        {
+            "name": "multipass",
+            "displayName": "Multi-Pass Workflow",
+            "isExpanded": false
+        },
+        {
+            "name": "advanced",
+            "displayName": "Advanced",
+            "isExpanded": false
+        }
+    ],
     "inputs": [
         {
             "name": "ollama_endpoint",
             "type": "string",
-            "label": "Ollama API Endpoint",
+            "label": "API Endpoint",
+            "groupName": "connection",
             "defaultValue": "http://localhost:11434/api/chat",
             "required": true,
-            "helpMarkDown": "The full URL to your Ollama API endpoint. Supports both HTTP and HTTPS. Example: http://localhost:11434/api/chat or https://ollama.yourdomain.com/api/chat"
+            "helpMarkDown": "Full URL to your Ollama API endpoint. Examples:\n- `http://localhost:11434/api/chat`\n- `https://ollama.yourdomain.com/api/chat`"
         },
         {
             "name": "ai_model",
             "type": "string",
-            "label": "Ollama Model",
+            "label": "Default Model",
+            "groupName": "connection",
             "defaultValue": "gpt-oss:20b",
             "required": true,
-            "helpMarkDown": "## Ollama Model Configuration\n\n### Description\nSpecify the Ollama model to use for code analysis. You can use any model available in your Ollama instance.\n\n### Recommended Models for Code Review\n- **gpt-oss** - Excellent for code review with strong reasoning (Highly Recommended)\n- **qwen2.5-coder** - Advanced code analysis and understanding\n- **deepseek-coder-v2** - Latest version optimized for code understanding\n- **codellama** - Meta's Code Llama model (stable and reliable)\n- **llama3.3** - Latest Llama model with improved reasoning\n- **llama3.2** - Llama 3.2 with strong performance\n- **mistral-large** - Large general-purpose model with excellent capabilities\n- **mixtral** - Mixture of experts model with strong performance\n- **codegemma** - Google's code-focused model\n\n### Custom Models\nYou can enter any custom model name that exists in your Ollama instance. Run `ollama list` on your Ollama server to see available models.\n\n### Default Value\nThe default model is set to **codellama** for compatibility.\n\nChoose or enter the model name that best suits your code review requirements."
+            "helpMarkDown": "Default model for all passes. Recommended: `gpt-oss`, `qwen2.5-coder`, `deepseek-coder-v2`, `codellama`"
+        },
+        {
+            "name": "bearer_token",
+            "type": "string",
+            "label": "Bearer Token",
+            "groupName": "connection",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Bearer token for authenticated endpoints. Use `$(VariableName)` for secrets."
         },
         {
             "name": "bugs",
             "type": "boolean",
             "label": "Check for bugs",
+            "groupName": "review",
             "defaultValue": true,
-            "helpMarkDown": "Specify whether to enable bug checking during the code review process.\n\n- Set to `true` to perform bug checks.\n- Set to `false` to skip bug checks.\n\nBug checking helps identify and address potential issues in the code. Default value is `true`."
+            "helpMarkDown": "Enable bug detection (null pointers, logic errors, exceptions)."
         },
         {
             "name": "performance",
             "type": "boolean",
-            "label": "Check for performance problems",
+            "label": "Check for performance issues",
+            "groupName": "review",
             "defaultValue": true,
-            "helpMarkDown": "Specify whether to include performance checks during the code review process.\n\n- Set to `true` to perform performance checks.\n- Set to `false` to skip performance checks.\n\nEnabling performance checks helps identify and address potential performance-related issues in the code. Default value is `true`."
+            "helpMarkDown": "Enable performance analysis (inefficient algorithms, memory leaks)."
         },
         {
             "name": "best_practices",
             "type": "boolean",
-            "label": "Check for missed best practices",
+            "label": "Check for best practices",
+            "groupName": "review",
             "defaultValue": true,
-            "helpMarkDown": "Specify whether to include checks for missed best practices during the code review process.\n\n- Set to `true` to perform best practices checks.\n- Set to `false` to skip best practices checks.\n\nEnabling best practices checks helps ensure adherence to coding standards and identifies areas for improvement. Default value is `true`."
-        },
-        {
-            "name": "file_extensions",
-            "type": "string",
-            "label": "File Extensions",
-            "defaultValue": "",
-            "required": false,
-            "helpMarkDown": "Specify a comma-separated list of file extensions for which you want to perform a code review. This input helps narrow down the scope of the code review to specific file types.\n\n**Example:**\n```plaintext\n\".js,.ts,.css,.html\"\n```\n\nMake sure to provide the file extensions without spaces after the commas."
-        },
-        {
-            "name": "file_excludes",
-            "type": "string",
-            "label": "Files to exclude",
-            "defaultValue": "",
-            "required": false,
-            "helpMarkDown": "## Files to Exclude Configuration\n\n### Description\nSpecify a comma-separated list of file names that should be excluded from code reviews. This is useful for excluding sensitive files or preventing certain files from being reviewed.\n\n### Format\nProvide a list of file names separated by commas. For example: `file1.js, file2.py, secret.txt`\n\n### Default Value\nIf no files are specified, all files will be considered for code review by default."
+            "helpMarkDown": "Enable best practice checks (coding standards, error handling)."
         },
         {
             "name": "additional_prompts",
             "type": "string",
-            "label": "Additional Prompts",
+            "label": "Additional Review Criteria",
+            "groupName": "review",
             "defaultValue": "",
             "required": false,
-            "helpMarkDown": "Specify additional Open AI prompts as a comma-separated list to enhance the code review process.\n\n- Add multiple prompts separated by commas.\n- These prompts will be used in conjunction with the main code review prompts.\n\n**Example:**\n```plaintext\nFix variable naming, Ensure consistent indentation, Review error handling approach\n```"
-        },
-        {
-            "name": "bearer_token",
-            "type": "string",
-            "label": "Bearer Token (Optional)",
-            "defaultValue": "",
-            "required": false,
-            "helpMarkDown": "## Bearer Token Configuration\n\n### Description\nProvide the Bearer token to authenticate with your secured Ollama API endpoint. This token will be sent in the `Authorization: Bearer <token>` header.\n\n**Leave empty if your Ollama endpoint does not require authentication.**\n\n### When to Use\nUse this when your Ollama API is exposed through a reverse proxy (like nginx) that requires Bearer token authentication.\n\n### Security Note\nStore sensitive tokens as pipeline variables or Azure Key Vault secrets rather than hardcoding them.\n\n### Example\nUse `$(OllamaApiToken)` to reference a pipeline variable."
+            "helpMarkDown": "Comma-separated additional criteria. Example: `Check for security issues, Verify error handling`"
         },
         {
             "name": "custom_best_practices",
             "type": "multiLine",
             "label": "Custom Best Practices",
+            "groupName": "review",
             "defaultValue": "",
             "required": false,
-            "helpMarkDown": "## Custom Best Practices Configuration\n\n### Description\nDefine project-specific or team-specific best practices that the AI should check for during code review. This helps enforce your organization's coding standards and conventions.\n\n### Format\nEnter each best practice on a new line or as a paragraph. The AI will use these guidelines when reviewing code.\n\n### Examples\n- Always use async/await instead of .then() for promises\n- All public methods must have JSDoc comments\n- Database queries must use parameterized statements\n- Error messages must be logged with context\n- CSS class names must follow BEM methodology\n\n### Default Value\nIf left empty, only the standard checks (bugs, performance, best practices) will be applied."
+            "helpMarkDown": "Project-specific coding standards (one per line):\n```\nAlways use async/await\nAll public methods need JSDoc\nUse parameterized queries\n```"
+        },
+        {
+            "name": "file_extensions",
+            "type": "string",
+            "label": "Include Extensions",
+            "groupName": "files",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Comma-separated file extensions to review. Example: `.js,.ts,.py,.cs`"
+        },
+        {
+            "name": "file_excludes",
+            "type": "string",
+            "label": "Exclude Files",
+            "groupName": "files",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Comma-separated files to exclude. Example: `package-lock.json,*.min.js`"
+        },
+        {
+            "name": "enableMultipass",
+            "type": "boolean",
+            "label": "Enable Multi-Pass Workflow",
+            "groupName": "multipass",
+            "defaultValue": true,
+            "helpMarkDown": "## Multi-Pass Workflow\n\nWhen enabled (default), uses 4 passes:\n1. **Context Check** - AI requests additional files if needed\n2. **Review** - Generate code review\n3. **Format** - Enforce consistent structure\n4. **Verify** - Validate issues exist in code\n\nWhen disabled, only uses the Review pass (faster but less accurate)."
+        },
+        {
+            "name": "pass1_model",
+            "type": "string",
+            "label": "Pass 1 Model (Context)",
+            "groupName": "multipass",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "enableMultipass=true",
+            "helpMarkDown": "Model for context check pass. Leave empty to use default model. Use a faster/smaller model for cost savings."
+        },
+        {
+            "name": "pass1_prompt",
+            "type": "multiLine",
+            "label": "Pass 1 Prompt (Context)",
+            "groupName": "multipass",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "enableMultipass=true",
+            "helpMarkDown": "Custom prompt for context check. Must respond with `READY` or `REQUEST_CONTEXT: file1, file2`"
+        },
+        {
+            "name": "pass2_model",
+            "type": "string",
+            "label": "Pass 2 Model (Review)",
+            "groupName": "multipass",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Model for review pass. Leave empty to use default model. Use your best model here."
+        },
+        {
+            "name": "pass2_prompt",
+            "type": "multiLine",
+            "label": "Pass 2 Prompt (Review)",
+            "groupName": "multipass",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Custom prompt for code review. Must respond with `NO_COMMENT` if no issues."
+        },
+        {
+            "name": "pass3_model",
+            "type": "string",
+            "label": "Pass 3 Model (Format)",
+            "groupName": "multipass",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "enableMultipass=true",
+            "helpMarkDown": "Model for format pass. Leave empty to use default model. A smaller model works fine here."
+        },
+        {
+            "name": "pass3_prompt",
+            "type": "multiLine",
+            "label": "Pass 3 Prompt (Format)",
+            "groupName": "multipass",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "enableMultipass=true",
+            "helpMarkDown": "Custom prompt for formatting. Enforces: Summary + Issues Found structure."
+        },
+        {
+            "name": "pass4_model",
+            "type": "string",
+            "label": "Pass 4 Model (Verify)",
+            "groupName": "multipass",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "enableMultipass=true",
+            "helpMarkDown": "Model for verify pass. Leave empty to use default model."
+        },
+        {
+            "name": "pass4_prompt",
+            "type": "multiLine",
+            "label": "Pass 4 Prompt (Verify)",
+            "groupName": "multipass",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "enableMultipass=true",
+            "helpMarkDown": "Custom prompt for verification. Removes hallucinated issues."
+        },
+        {
+            "name": "token_limit",
+            "type": "string",
+            "label": "Token Limit",
+            "groupName": "advanced",
+            "defaultValue": "8192",
+            "required": false,
+            "helpMarkDown": "Max tokens per request. Values: 8192, 16384, 32768, 65536, 131072"
+        },
+        {
+            "name": "debug_logging",
+            "type": "boolean",
+            "label": "Enable Debug Logging",
+            "groupName": "advanced",
+            "defaultValue": false,
+            "required": false,
+            "helpMarkDown": "Output detailed logs for troubleshooting. Warning: increases log size significantly."
         }
     ],
     "execution": {

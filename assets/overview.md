@@ -11,16 +11,64 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
 ## Why Choose Ollama Code Review?
 
 - **Self-Hosted & Secure:** Keep your code and reviews completely private on your own infrastructure. No data sent to external cloud services.
+- **3-Pass Verification (v2.7):** Context check → Review → Verify workflow ensures accurate, hallucination-free feedback.
+- **Agentic Context (v2.7):** AI can request additional files (imports, interfaces, base classes) for smarter reviews.
+- **Simplified Diff Format (v2.7):** Clear REMOVED/ADDED sections prevent AI confusion about what code exists.
 - **Automated Code Reviews:** Say goodbye to manual code inspections! Let Ollama analyze your code changes, catching bugs, performance issues, and suggesting best practices.
 - **AI-Powered Insights:** Leverage powerful open-source language models like CodeLlama, Llama 3, DeepSeek Coder, and more to receive insightful comments on your pull requests.
-- **Enhanced Context (v2.0):** The AI receives the full file content, project metadata (README, dependencies), and language-specific project files for more informed reviews.
-- **Custom Best Practices (v2.0):** Define your organization's specific coding standards and have the AI enforce them during reviews.
+- **Custom System Prompt:** Complete control over AI behavior - override the default prompt with your own instructions.
+- **Configurable Token Limit:** Adjust for models with larger context windows (8k to 128k+).
+- **Debug Logging:** Extensive logging for troubleshooting issues.
+- **OpenAI-Compatible:** Works with Ollama and any OpenAI-compatible API endpoint.
+- **Enhanced Context:** The AI receives the full file content, project metadata (README, dependencies), and language-specific project files for more informed reviews.
+- **Custom Best Practices:** Define your organization's specific coding standards and have the AI enforce them during reviews.
 - **Multi-Language Support:** Automatic detection and context gathering for JavaScript, TypeScript, Python, C#, Java, and more.
 - **Faster Reviews:** Reduce the time spent on code reviews. Let Ollama handle the routine, allowing your team to focus on impactful work.
 - **Configurable and Customizable:** Tailor the extension to your needs with customizable settings. Choose from various Ollama models, define file exclusions, and more.
 - **Cost-Effective:** No API costs or per-token charges. Run unlimited code reviews on your own hardware.
 
-## What's New in v2.0
+## What's New in v2.7
+
+🔄 **3-Pass Review Workflow** - More accurate reviews:
+- **Pass 1 (Context Check)**: AI determines if it needs additional files to review properly
+- **Pass 2 (Review)**: AI generates the code review with full context
+- **Pass 3 (Verify)**: AI validates its own review against the actual code, eliminating hallucinations
+
+🧠 **Agentic Context Requests** - Smarter AI:
+- AI can request imported files, interfaces, and base classes it needs
+- Smart file fetcher with search fallback if AI gives incorrect path
+- Maximum 3 additional files per review to stay focused
+
+📊 **Simplified Diff Format** - Clearer input for AI:
+- Transforms confusing git diff (`+`/`-` prefixes) into clear sections
+- `=== REMOVED (old code - no longer exists) ===`
+- `=== ADDED (new code - review this) ===`
+- Prevents AI from thinking deleted code still exists
+
+🏗️ **Modular Codebase** - Better maintainability:
+- Clean separation: types, prompts, api-client, ollama modules
+- Easier to extend and customize for your needs
+
+## What's New in v2.5
+
+📝 **Custom System Prompt** - Complete control over AI behavior:
+- Override the entire system prompt with your own instructions
+- Perfect for security-focused reviews or custom workflows
+- Use when you need specific review formats
+
+🔢 **Configurable Token Limit** - Adjust for your model:
+- Set `token_limit` based on your model's context window
+- Supports values from 8192 to 131072+
+- Enables use of larger context models
+
+🐞 **Debug Logging** - Troubleshoot with ease:
+- Enable with `debug_logging: true`
+- Logs system prompts, diffs, API requests/responses
+- Token counts and file processing details
+
+🌐 **OpenAI-Compatible API** - Works with more endpoints:
+- Supports both Ollama native and OpenAI-compatible formats
+- Use with any OpenAI-compatible API endpoint
 
 🎉 **Enhanced AI Context** - The AI now receives:
 - Complete file content (not just diffs) for better understanding
@@ -32,7 +80,7 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
 - Enforce organizational guidelines
 - Ensure consistency across your codebase
 
-🌐 **Improved Language Support**:
+🌍 **Improved Language Support**:
 - JavaScript/TypeScript: package.json analysis
 - Python: requirements.txt parsing
 - C#: .csproj, .sln, and packages.config support
@@ -70,7 +118,7 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
      pool:
        vmImage: 'ubuntu-latest'
      steps:
-     - task: OllamaCodeReview@1
+     - task: OllamaCodeReview@2
        inputs:
          ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
          ai_model: 'gpt-oss'
@@ -79,6 +127,8 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
          best_practices: true
          file_extensions: 'js,ts,css,html'
          file_excludes: 'file1.js,file2.py,secret.txt'
+         token_limit: '16384'
+         debug_logging: false
          additional_prompts: 'Fix variable naming, Ensure consistent indentation, Review error handling approach'
          custom_best_practices: |
            Always use async/await instead of .then() for promises
@@ -165,7 +215,7 @@ server {
 Then use the Bearer Token field in the extension configuration to authenticate:
 
 ```yaml
-- task: OllamaCodeReview@1
+- task: OllamaCodeReview@2
   inputs:
     ollama_endpoint: 'https://ollama.example.com/api/chat'
     ai_model: 'gpt-oss'

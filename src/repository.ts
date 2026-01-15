@@ -56,9 +56,84 @@ export class Repository {
         try {
             return await fs.promises.readFile(filePath, 'utf-8');
         } catch (error) {
-            tl.warning(`Could not read file content for ${fileName}: ${error}`);
+            // File not found at exact path
             return '';
         }
+    }
+
+    /**
+     * Smart file fetcher: tries exact path first, then searches by filename
+     */
+    public async GetFileContentSmart(requestedPath: string): Promise<{ content: string; actualPath: string }> {
+        const fs = require('fs');
+        const path = require('path');
+        const workingDirectory = tl.getVariable('System.DefaultWorkingDirectory')!;
+        
+        // 1. Try exact path first
+        const exactPath = path.join(workingDirectory, requestedPath);
+        try {
+            const content = await fs.promises.readFile(exactPath, 'utf-8');
+            return { content, actualPath: requestedPath };
+        } catch {
+            // Not found at exact path, continue to search
+        }
+
+        // 2. Extract just the filename
+        const fileName = path.basename(requestedPath);
+        if (!fileName) {
+            return { content: '', actualPath: '' };
+        }
+
+        // 3. Search for the file in the repository
+        const foundPath = await this.SearchForFile(fileName, workingDirectory);
+        if (foundPath) {
+            try {
+                const content = await fs.promises.readFile(foundPath, 'utf-8');
+                const relativePath = path.relative(workingDirectory, foundPath);
+                console.log(`[DEBUG] File "${requestedPath}" not found, but found at "${relativePath}"`);
+                return { content, actualPath: relativePath };
+            } catch {
+                return { content: '', actualPath: '' };
+            }
+        }
+
+        return { content: '', actualPath: '' };
+    }
+
+    /**
+     * Recursively search for a file by name in the repository
+     */
+    private async SearchForFile(fileName: string, directory: string, maxDepth: number = 10): Promise<string | null> {
+        const fs = require('fs');
+        const path = require('path');
+        
+        if (maxDepth <= 0) return null;
+
+        // Directories to skip
+        const skipDirs = ['node_modules', '.git', 'bin', 'obj', 'dist', 'build', '.vs', 'packages', 'vendor'];
+        
+        try {
+            const entries = await fs.promises.readdir(directory, { withFileTypes: true });
+            
+            // First check files in current directory
+            for (const entry of entries) {
+                if (entry.isFile() && entry.name === fileName) {
+                    return path.join(directory, entry.name);
+                }
+            }
+            
+            // Then recurse into subdirectories
+            for (const entry of entries) {
+                if (entry.isDirectory() && !skipDirs.includes(entry.name) && !entry.name.startsWith('.')) {
+                    const result = await this.SearchForFile(fileName, path.join(directory, entry.name), maxDepth - 1);
+                    if (result) return result;
+                }
+            }
+        } catch {
+            // Ignore permission errors, etc.
+        }
+        
+        return null;
     }
 
     public async GetProjectContext(): Promise<string> {

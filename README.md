@@ -1,6 +1,6 @@
 # Ollama Code Review - Azure DevOps Extension
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
+[![Version](https://img.shields.io/badge/version-2.7.0-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 An Azure DevOps extension that brings AI-powered code reviews to your pull requests using self-hosted Ollama language models. Keep your code secure and private while leveraging powerful AI for automated code analysis.
@@ -9,15 +9,43 @@ An Azure DevOps extension that brings AI-powered code reviews to your pull reque
 
 - 🔒 **Self-Hosted & Secure** - Run entirely on your own infrastructure
 - 🤖 **AI-Powered Reviews** - Leverages Ollama's powerful language models
+- � **3-Pass Verification** - Context check → Review → Verify for accurate feedback
+- 🧠 **Agentic Context** - AI can request additional files it needs to review properly
+- 📊 **Simplified Diff Format** - Clear REMOVED/ADDED sections prevent AI confusion
 - 🐛 **Bug Detection** - Automatically identifies potential bugs
 - ⚡ **Performance Analysis** - Highlights performance issues
 - 📋 **Best Practices** - Suggests improvements and coding standards
 - 🎯 **Custom Best Practices** - Define your own project-specific coding standards
+- 📝 **Custom System Prompt** - Complete control over AI behavior
+- 🔢 **Configurable Token Limit** - Adjust for models with larger context windows
+- 🐞 **Debug Logging** - Extensive logging for troubleshooting
 - 📚 **Rich Context** - Provides AI with full file content and project metadata
 - 🔧 **Highly Configurable** - Customize review criteria and file filters
 - 🔐 **Bearer Token Support** - Secure your API with authentication
+- 🌐 **OpenAI-Compatible API** - Works with Ollama and OpenAI-compatible endpoints
 - 💰 **Cost-Effective** - No API costs or per-token charges
-- 🌐 **Multi-Language Support** - JavaScript, TypeScript, Python, C#, Java and more
+- 🌍 **Multi-Language Support** - JavaScript, TypeScript, Python, C#, Java and more
+
+## What's New in v2.7
+
+🔄 **3-Pass Review Workflow** - More accurate reviews:
+- **Pass 1 (Context Check)**: AI determines if it needs additional files
+- **Pass 2 (Review)**: AI generates the code review
+- **Pass 3 (Verify)**: AI validates its own review against the actual code
+
+🧠 **Agentic Context Requests** - Smarter AI:
+- AI can request imported files, interfaces, and base classes
+- Smart file fetcher with search fallback for incorrect paths
+- Maximum 3 additional files per review to stay focused
+
+📊 **Simplified Diff Format** - Clearer input for AI:
+- Transforms git diff into clear REMOVED/ADDED sections
+- Prevents AI confusion about what code exists
+- Explicit labels: "old code - no longer exists" vs "new code - review this"
+
+🏗️ **Modular Codebase** - Better maintainability:
+- Split into focused modules: types, prompts, api-client, ollama
+- Easier to extend and customize
 
 ## Prerequisites
 
@@ -61,7 +89,7 @@ jobs:
   pool:
     vmImage: 'ubuntu-latest'
   steps:
-  - task: OllamaCodeReview@1
+  - task: OllamaCodeReview@2
     displayName: 'AI Code Review'
     inputs:
       ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
@@ -96,6 +124,9 @@ Add [Build validation](https://learn.microsoft.com/en-us/azure/devops/repos/git/
 | `additional_prompts` | string | No | Custom review instructions |
 | `custom_best_practices` | multiLine | No | Project-specific best practices (one per line) |
 | `bearer_token` | string | No | Bearer token for authenticated endpoints |
+| `debug_logging` | boolean | No | Enable extensive debug output (default: `false`) |
+| `token_limit` | string | No | Max tokens for AI context (default: `8192`) |
+| `custom_system_prompt` | multiLine | No | Override the entire system prompt |
 
 ## Securing Your Ollama API
 
@@ -128,7 +159,7 @@ server {
 Then use the Bearer token in your pipeline:
 
 ```yaml
-- task: OllamaCodeReview@1
+- task: OllamaCodeReview@2
   inputs:
     ollama_endpoint: 'https://ollama.example.com/api/chat'
     ai_model: 'gpt-oss'
@@ -154,7 +185,7 @@ This comprehensive context allows the AI to make more informed suggestions based
 Define your organization's or team's specific coding standards:
 
 ```yaml
-- task: OllamaCodeReview@1
+- task: OllamaCodeReview@2
   inputs:
     custom_best_practices: |
       Always use async/await instead of .then() for promises
@@ -165,6 +196,53 @@ Define your organization's or team's specific coding standards:
 ```
 
 The AI will check for these practices in addition to standard bug detection and performance analysis.
+
+## Custom System Prompt (Advanced)
+
+For complete control over the AI's behavior, override the entire system prompt:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    custom_system_prompt: |
+      You are a security-focused code reviewer. Review the code for:
+      - SQL injection vulnerabilities
+      - XSS vulnerabilities  
+      - Authentication/authorization issues
+      
+      Respond in markdown. If no issues found, respond with NO_COMMENT.
+```
+
+**Note:** When using a custom system prompt, the `bugs`, `performance`, `best_practices`, and `additional_prompts` options are ignored.
+
+## Token Limit Configuration
+
+Adjust the token limit based on your model's context window:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    token_limit: '32768'  # For models with larger context windows
+```
+
+Recommended values:
+- `8192` - Default, works for most models
+- `16384` - Llama 3.2, etc.
+- `32768` - qwen2.5-coder:32k
+- `65536` - deepseek-coder-v2
+- `131072` - Models with 128k context
+
+## Debug Logging
+
+Enable extensive logging for troubleshooting:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    debug_logging: true
+```
+
+This logs: system prompts, file content, diffs, token counts, API requests/responses, and more.
 
 ## Supported Models
 
