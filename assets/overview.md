@@ -11,12 +11,13 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
 ## Why Choose Ollama Code Review?
 
 - **Self-Hosted & Secure:** Keep your code and reviews completely private on your own infrastructure. No data sent to external cloud services.
-- **3-Pass Verification (v2.7):** Context check → Review → Verify workflow ensures accurate, hallucination-free feedback.
-- **Agentic Context (v2.7):** AI can request additional files (imports, interfaces, base classes) for smarter reviews.
-- **Simplified Diff Format (v2.7):** Clear REMOVED/ADDED sections prevent AI confusion about what code exists.
+- **4-Pass Verification (v2.8):** Context check → Review → Format → Verify workflow ensures accurate, hallucination-free feedback.
+- **Per-Pass Model Selection (v2.8):** Use different models for each pass - fast models for context/format, best models for review.
+- **Custom Pass Prompts (v2.8):** Override the default prompt for any workflow pass.
+- **Agentic Context:** AI can request additional files (imports, interfaces, base classes) for smarter reviews.
+- **Simplified Diff Format:** Clear REMOVED/ADDED sections prevent AI confusion about what code exists.
 - **Automated Code Reviews:** Say goodbye to manual code inspections! Let Ollama analyze your code changes, catching bugs, performance issues, and suggesting best practices.
 - **AI-Powered Insights:** Leverage powerful open-source language models like CodeLlama, Llama 3, DeepSeek Coder, and more to receive insightful comments on your pull requests.
-- **Custom System Prompt:** Complete control over AI behavior - override the default prompt with your own instructions.
 - **Configurable Token Limit:** Adjust for models with larger context windows (8k to 128k+).
 - **Debug Logging:** Extensive logging for troubleshooting issues.
 - **OpenAI-Compatible:** Works with Ollama and any OpenAI-compatible API endpoint.
@@ -27,12 +28,22 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
 - **Configurable and Customizable:** Tailor the extension to your needs with customizable settings. Choose from various Ollama models, define file exclusions, and more.
 - **Cost-Effective:** No API costs or per-token charges. Run unlimited code reviews on your own hardware.
 
-## What's New in v2.7
+## What's New in v2.8
 
-🔄 **3-Pass Review Workflow** - More accurate reviews:
+🔄 **4-Pass Review Workflow** - Enhanced accuracy with format enforcement:
 - **Pass 1 (Context Check)**: AI determines if it needs additional files to review properly
 - **Pass 2 (Review)**: AI generates the code review with full context
-- **Pass 3 (Verify)**: AI validates its own review against the actual code, eliminating hallucinations
+- **Pass 3 (Format)**: Enforces consistent Summary + Issues Found structure
+- **Pass 4 (Verify)**: AI validates its own review against the actual code, removing hallucinations
+
+🎛️ **Per-Pass Model Selection** - Optimize cost and performance:
+- Configure different models for each pass (e.g., fast model for context, best model for review)
+- Use smaller/faster models for formatting and context checks
+- Reserve your most capable model for the actual review pass
+
+📝 **Custom Pass Prompts** - Full control over each workflow stage:
+- Override the default prompt for any pass with `pass1_prompt`, `pass2_prompt`, `pass3_prompt`, `pass4_prompt`
+- Customize context request behavior, review criteria, format rules, and verification logic
 
 🧠 **Agentic Context Requests** - Smarter AI:
 - AI can request imported files, interfaces, and base classes it needs
@@ -46,7 +57,7 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
 - Prevents AI from thinking deleted code still exists
 
 🏗️ **Modular Codebase** - Better maintainability:
-- Clean separation: types, prompts, api-client, ollama modules
+- Clean separation: types, prompts, api-client, ollama, pullrequest, repository modules
 - Easier to extend and customize for your needs
 
 ## What's New in v2.5
@@ -129,12 +140,19 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
          file_excludes: 'file1.js,file2.py,secret.txt'
          token_limit: '16384'
          debug_logging: false
+         enableMultipass: true
+         # Optional: Use different models per pass for cost optimization
+         # pass1_model: 'qwen2.5-coder:7b'   # Fast model for context check
+         # pass2_model: 'gpt-oss:20b'        # Best model for review
+         # pass3_model: 'qwen2.5-coder:7b'   # Fast model for formatting
+         # pass4_model: 'qwen2.5-coder:14b'  # Medium model for verification
          additional_prompts: 'Fix variable naming, Ensure consistent indentation, Review error handling approach'
          custom_best_practices: |
            Always use async/await instead of .then() for promises
            All public methods must have JSDoc comments
-           Database queries must use parameterized statements`
-   
+           Database queries must use parameterized statements
+   ```
+
 3. If you do not already have Build Validation configured for your branch already add [Build validation](https://learn.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops&tabs=browser#build-validation) to your branch policy to trigger the code review when a Pull Request is created
 
 ## FAQ
