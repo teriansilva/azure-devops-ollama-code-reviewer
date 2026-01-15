@@ -1,6 +1,6 @@
 # Ollama Code Review - Azure DevOps Extension
 
-[![Version](https://img.shields.io/badge/version-2.7.0-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
+[![Version](https://img.shields.io/badge/version-2.8.5-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 An Azure DevOps extension that brings AI-powered code reviews to your pull requests using self-hosted Ollama language models. Keep your code secure and private while leveraging powerful AI for automated code analysis.
@@ -9,7 +9,7 @@ An Azure DevOps extension that brings AI-powered code reviews to your pull reque
 
 - 🔒 **Self-Hosted & Secure** - Run entirely on your own infrastructure
 - 🤖 **AI-Powered Reviews** - Leverages Ollama's powerful language models
-- � **3-Pass Verification** - Context check → Review → Verify for accurate feedback
+- 🔄 **4-Pass Verification** - Context check → Review → Format → Verify for accurate feedback
 - 🧠 **Agentic Context** - AI can request additional files it needs to review properly
 - 📊 **Simplified Diff Format** - Clear REMOVED/ADDED sections prevent AI confusion
 - 🐛 **Bug Detection** - Automatically identifies potential bugs
@@ -17,6 +17,7 @@ An Azure DevOps extension that brings AI-powered code reviews to your pull reque
 - 📋 **Best Practices** - Suggests improvements and coding standards
 - 🎯 **Custom Best Practices** - Define your own project-specific coding standards
 - 📝 **Custom System Prompt** - Complete control over AI behavior
+- 🎛️ **Per-Pass Model Selection** - Use different models for each workflow pass
 - 🔢 **Configurable Token Limit** - Adjust for models with larger context windows
 - 🐞 **Debug Logging** - Extensive logging for troubleshooting
 - 📚 **Rich Context** - Provides AI with full file content and project metadata
@@ -26,12 +27,22 @@ An Azure DevOps extension that brings AI-powered code reviews to your pull reque
 - 💰 **Cost-Effective** - No API costs or per-token charges
 - 🌍 **Multi-Language Support** - JavaScript, TypeScript, Python, C#, Java and more
 
-## What's New in v2.7
+## What's New in v2.8
 
-🔄 **3-Pass Review Workflow** - More accurate reviews:
+🔄 **4-Pass Review Workflow** - Enhanced accuracy with format enforcement:
 - **Pass 1 (Context Check)**: AI determines if it needs additional files
 - **Pass 2 (Review)**: AI generates the code review
-- **Pass 3 (Verify)**: AI validates its own review against the actual code
+- **Pass 3 (Format)**: Enforces consistent Summary + Issues Found structure
+- **Pass 4 (Verify)**: AI validates its own review against the actual code, removing hallucinations
+
+🎛️ **Per-Pass Model Selection** - Optimize cost and performance:
+- Configure different models for each pass (e.g., fast model for context, best model for review)
+- Use smaller/faster models for formatting and context checks
+- Reserve your most capable model for the actual review pass
+
+📝 **Custom Pass Prompts** - Full control over each workflow stage:
+- Override the default prompt for any pass
+- Customize context request behavior, review criteria, format rules, and verification logic
 
 🧠 **Agentic Context Requests** - Smarter AI:
 - AI can request imported files, interfaces, and base classes
@@ -44,7 +55,7 @@ An Azure DevOps extension that brings AI-powered code reviews to your pull reque
 - Explicit labels: "old code - no longer exists" vs "new code - review this"
 
 🏗️ **Modular Codebase** - Better maintainability:
-- Split into focused modules: types, prompts, api-client, ollama
+- Split into focused modules: types, prompts, api-client, ollama, pullrequest, repository
 - Easier to extend and customize
 
 ## Prerequisites
@@ -112,21 +123,51 @@ Add [Build validation](https://learn.microsoft.com/en-us/azure/devops/repos/git/
 
 ## Configuration Options
 
+### Connection
+
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `ollama_endpoint` | string | Yes | Full URL to your Ollama API endpoint |
-| `ai_model` | string | Yes | Ollama model name (e.g., `codellama`, `llama3.1`) |
+| `ai_model` | string | Yes | Default Ollama model for all passes |
+| `bearer_token` | string | No | Bearer token for authenticated endpoints |
+
+### Review Options
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
 | `bugs` | boolean | No | Check for bugs (default: `true`) |
 | `performance` | boolean | No | Check for performance issues (default: `true`) |
 | `best_practices` | boolean | No | Check for best practices (default: `true`) |
+| `additional_prompts` | string | No | Custom review instructions (comma-separated) |
+| `custom_best_practices` | multiLine | No | Project-specific best practices (one per line) |
+
+### File Filters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
 | `file_extensions` | string | No | Comma-separated list of file extensions to review |
 | `file_excludes` | string | No | Comma-separated list of files to exclude |
-| `additional_prompts` | string | No | Custom review instructions |
-| `custom_best_practices` | multiLine | No | Project-specific best practices (one per line) |
-| `bearer_token` | string | No | Bearer token for authenticated endpoints |
+
+### Multi-Pass Workflow
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `enableMultipass` | boolean | No | Enable 4-pass workflow (default: `true`) |
+| `pass1_model` | string | No | Model for context check pass (uses default if empty) |
+| `pass1_prompt` | multiLine | No | Custom prompt for context check |
+| `pass2_model` | string | No | Model for review pass (uses default if empty) |
+| `pass2_prompt` | multiLine | No | Custom prompt for code review |
+| `pass3_model` | string | No | Model for format pass (uses default if empty) |
+| `pass3_prompt` | multiLine | No | Custom prompt for formatting |
+| `pass4_model` | string | No | Model for verify pass (uses default if empty) |
+| `pass4_prompt` | multiLine | No | Custom prompt for verification |
+
+### Advanced
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
 | `debug_logging` | boolean | No | Enable extensive debug output (default: `false`) |
 | `token_limit` | string | No | Max tokens for AI context (default: `8192`) |
-| `custom_system_prompt` | multiLine | No | Override the entire system prompt |
 
 ## Securing Your Ollama API
 
@@ -197,14 +238,62 @@ Define your organization's or team's specific coding standards:
 
 The AI will check for these practices in addition to standard bug detection and performance analysis.
 
-## Custom System Prompt (Advanced)
+## Multi-Pass Workflow Configuration
 
-For complete control over the AI's behavior, override the entire system prompt:
+The 4-pass workflow provides the most accurate reviews by separating concerns:
+
+### Using Different Models Per Pass
+
+Optimize cost and performance by using smaller models for simpler tasks:
 
 ```yaml
 - task: OllamaCodeReview@2
   inputs:
-    custom_system_prompt: |
+    ollama_endpoint: 'http://your-ollama-server:11434/api/chat'
+    ai_model: 'gpt-oss'                    # Default model
+    enableMultipass: true
+    pass1_model: 'qwen2.5-coder:7b'        # Fast model for context check
+    pass2_model: 'gpt-oss:20b'             # Best model for review
+    pass3_model: 'qwen2.5-coder:7b'        # Fast model for formatting
+    pass4_model: 'qwen2.5-coder:14b'       # Medium model for verification
+```
+
+### Custom Pass Prompts
+
+Override the default prompts for specific passes:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    enableMultipass: true
+    pass2_prompt: |
+      You are a security-focused code reviewer.
+      Focus on: SQL injection, XSS, authentication issues.
+      Respond with NO_COMMENT if no security issues found.
+    pass4_prompt: |
+      Verify each security issue exists in the ADDED code.
+      Remove any false positives.
+      Respond with NO_COMMENT if no valid issues remain.
+```
+
+### Disabling Multi-Pass
+
+For faster (but less accurate) reviews, disable multi-pass:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    enableMultipass: false  # Only runs the Review pass
+```
+
+## Custom System Prompt (Advanced)
+
+For complete control over the AI's behavior in the review pass, use `pass2_prompt`:
+
+```yaml
+- task: OllamaCodeReview@2
+  inputs:
+    pass2_prompt: |
       You are a security-focused code reviewer. Review the code for:
       - SQL injection vulnerabilities
       - XSS vulnerabilities  
@@ -213,7 +302,7 @@ For complete control over the AI's behavior, override the entire system prompt:
       Respond in markdown. If no issues found, respond with NO_COMMENT.
 ```
 
-**Note:** When using a custom system prompt, the `bugs`, `performance`, `best_practices`, and `additional_prompts` options are ignored.
+**Note:** When using a custom pass2 prompt, the `bugs`, `performance`, `best_practices`, and `additional_prompts` options are ignored for that pass.
 
 ## Token Limit Configuration
 
@@ -304,7 +393,10 @@ npx tfx-cli extension create
 .
 ├── src/
 │   ├── main.ts           # Entry point
-│   ├── ollama.ts         # Ollama API integration
+│   ├── types.ts          # TypeScript interfaces and types
+│   ├── prompts.ts        # Prompt builder for all passes
+│   ├── api-client.ts     # HTTP client for Ollama API
+│   ├── ollama.ts         # Ollama integration and multi-pass orchestration
 │   ├── pullrequest.ts    # Azure DevOps PR API
 │   ├── repository.ts     # Git repository operations
 │   └── task.json         # Task definition
