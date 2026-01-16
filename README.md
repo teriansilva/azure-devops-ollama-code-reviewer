@@ -1,6 +1,6 @@
 # Ollama Code Review - Azure DevOps Extension
 
-[![Version](https://img.shields.io/badge/version-2.8.5-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
+[![Version](https://img.shields.io/badge/version-2.8.6-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 An Azure DevOps extension that brings AI-powered code reviews to your pull requests using self-hosted Ollama language models. Keep your code secure and private while leveraging powerful AI for automated code analysis.
