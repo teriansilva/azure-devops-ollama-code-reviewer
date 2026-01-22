@@ -162,14 +162,19 @@ For each issue:
 - Is the problem real (not hallucinated)?
 - Is it about code that EXISTS (not removed/deleted code)?
 
-## Your Response
-1. Keep ONLY issues that are VERIFIED to exist in the actual code
-2. Remove any hallucinated or incorrect issues
-3. Keep the same format structure
-4. Update the Summary if you removed issues
-5. If NO valid issues remain, respond with: NO_COMMENT
+## CRITICAL Rules
+1. DO NOT change the wording, structure, or formatting of valid issues
+2. DO NOT add new issues or modify existing descriptions
+3. DO NOT rephrase the Summary, Problem, or Fix fields
+4. ONLY remove issues that are clearly hallucinated or invalid
+5. If an issue is valid, copy it EXACTLY as written - character for character
+6. Keep the exact same markdown structure and formatting
+7. If ALL issues are valid, return the review UNCHANGED
+8. If NO valid issues remain, respond with: NO_COMMENT
 
-Respond with the validated review.`;
+Your ONLY job is to REMOVE invalid issues. Never edit valid ones.
+
+Respond with the validated review (unchanged except for removed invalid issues).`;
     }
 
     // ========================================================================
