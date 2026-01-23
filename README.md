@@ -2,6 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-2.8.8-blue)](https://github.com/teriansilva/azure-devops-ollama-code-reviewer)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/teriansilva)
 
 An Azure DevOps extension that brings AI-powered code reviews to your pull requests using self-hosted Ollama language models. Keep your code secure and private while leveraging powerful AI for automated code analysis.
 
