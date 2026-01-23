@@ -1,14 +1,21 @@
 # Ollama Code Review Extension
 
-## Supercharge Your Code Reviews with Self-Hosted AI
+<p align="center">
+  <strong>🤖 AI-Powered Code Reviews for Azure DevOps</strong><br>
+  Self-hosted • Secure • OpenAI Compatible
+</p>
 
-Welcome to the Ollama Code Review Extension – your new ally in building top-notch software! This extension seamlessly integrates Ollama's powerful self-hosted language models into your Azure DevOps pipeline, transforming code reviews into an intelligent and efficient process while keeping your code secure on your own infrastructure.
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=teriansilva.olcr">📦 Install from Marketplace</a> •
+  <a href="https://github.com/teriansilva/azure-devops-ollama-code-reviewer">📖 Documentation</a> •
+  <a href="https://buymeacoffee.com/teriansilva">☕ Support</a>
+</p>
 
-### Get Started Now!
+---
 
-Enhance your development workflow with Ollama Code Review. Start receiving intelligent and actionable insights on your code changes using your own self-hosted AI models. Install the extension today and experience the future of code reviews with complete control over your data!
+## Why Ollama Code Review?
 
-## Why Choose Ollama Code Review?
+Transform your pull request workflow with AI-powered code reviews that run entirely on your infrastructure.
 
 - **Self-Hosted & Secure:** Keep your code and reviews completely private on your own infrastructure. No data sent to external cloud services.
 - **4-Pass Verification (v2.8):** Context check → Review → Format → Verify workflow ensures accurate, hallucination-free feedback.
@@ -81,15 +88,10 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
 - Supports both Ollama native and OpenAI-compatible formats
 - Use with any OpenAI-compatible API endpoint
 
-🎉 **Enhanced AI Context** - The AI now receives:
-- Complete file content (not just diffs) for better understanding
-- Project metadata: README, package.json, requirements.txt, .csproj, .sln, etc.
-- Language-specific dependency information
+## Key Features
 
-🎯 **Custom Best Practices** - Define your own project-specific coding standards:
-- Add team conventions
-- Enforce organizational guidelines
-- Ensure consistency across your codebase
+### 🏗️ Build Log Context
+AI sees your pipeline execution - build status, errors, test results.
 
 🌍 **Improved Language Support**:
 - JavaScript/TypeScript: package.json analysis
@@ -97,21 +99,18 @@ Enhance your development workflow with Ollama Code Review. Start receiving intel
 - C#: .csproj, .sln, and packages.config support
 - Java: pom.xml detection
 
-## Prerequisites
+### 🎯 Custom Best Practices
+Define your team's coding standards.
 
-- A running [Ollama](https://ollama.ai/) instance accessible from your build agents
-- Ollama models installed (e.g., `ollama pull gpt-oss` or `ollama pull qwen2.5-coder`)
+### 📝 Custom System Prompt
+Override AI instructions for specialized reviews.
 
-## Getting started
+### 🔐 Bearer Token Support
+Secure your API endpoints.
 
-1. **Set up Ollama:**
-   - Install Ollama on your server or local machine following the [Ollama installation guide](https://ollama.ai/)
-   - Pull your preferred model: `ollama pull gpt-oss` (recommended) or `qwen2.5-coder`, `deepseek-coder-v2`, `codellama`, etc.
-   - Ensure Ollama is running and accessible from your Azure DevOps build agents
+---
 
-2. **Install the Ollama Code Review DevOps Extension.**
-
-3. **Add Ollama Code Review Task to Your Pipeline:**
+## Quick Start
 
    ```yaml
    trigger:
@@ -230,8 +229,13 @@ server {
 
 **Important:** Replace `ollama.example.com`, SSL certificate paths, and `YOUR_SECRET_TOKEN_HERE` with your actual values.
 
-Then use the Bearer Token field in the extension configuration to authenticate:
+### 2. Set Up Ollama
+```bash
+curl https://ollama.ai/install.sh | sh
+ollama pull gpt-oss
+```
 
+### 3. Add to Your Pipeline
 ```yaml
 - task: OllamaCodeReview@2
   inputs:
@@ -240,16 +244,86 @@ Then use the Bearer Token field in the extension configuration to authenticate:
     bearer_token: '$(OllamaApiToken)'  # Store as pipeline variable
 ```
 
-## Supported Ollama Models
+---
 
-This extension works with any Ollama model, but these are particularly well-suited for code reviews:
+## Configuration
 
-- **gpt-oss** - Excellent for code review with strong reasoning (Recommended)
-- **qwen2.5-coder** - Advanced code analysis and understanding
-- **deepseek-coder-v2** - Latest version optimized for code understanding
-- **codellama** - Meta's specialized code model (stable)
-- **llama3.3** / **llama3.2** - Latest Llama models with improved reasoning
-- **mistral-large** / **mixtral** - Efficient general-purpose models
-- **codegemma** - Google's code-focused model
+### Essential Parameters
 
-Run `ollama list` on your Ollama server to see all available models.
+| Parameter | Description |
+|-----------|-------------|
+| `ollama_endpoint` | Your Ollama API URL |
+| `ai_model` | Model name (e.g., `gpt-oss`) |
+| `bugs` / `performance` / `best_practices` | Review categories |
+
+### Context Options
+
+| Parameter | Description |
+|-----------|-------------|
+| `include_build_logs` | Include pipeline build logs |
+| `build_log_tasks` | Filter specific tasks |
+| `include_pr_comments` | See existing comments |
+
+### Token Management
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `token_limit` | 8192 | Max tokens per request |
+| `max_file_content_tokens` | 4000 | File content limit |
+| `max_project_context_tokens` | 2000 | Project metadata limit |
+
+### Advanced
+
+| Parameter | Description |
+|-----------|-------------|
+| `file_extensions` | Extensions to review |
+| `file_excludes` | Files to skip |
+| `custom_best_practices` | Your coding standards |
+| `custom_system_prompt` | Override AI instructions |
+| `bearer_token` | API authentication |
+
+---
+
+## Recommended Models
+
+| Model | Use Case |
+|-------|----------|
+| **gpt-oss** | General code review ⭐ |
+| **qwen2.5-coder** | Advanced analysis |
+| **deepseek-coder-v2** | Code understanding |
+| **codellama** | Stable reviews |
+| **llama3.3** | Strong reasoning |
+
+---
+
+## Permissions Required
+
+### Pipeline Settings
+Enable **"Allow scripts to access OAuth token"**
+
+### Repository Permissions
+Grant **"Contribute to pull requests"** to Build Service
+
+---
+
+## What's New
+
+**v2.4** - OpenAI-compatible API support, build log filtering  
+**v2.3** - Token logging, custom system prompt  
+**v2.2** - Configurable token limits  
+**v2.1** - Line-specific comments, build logs, PR awareness
+
+---
+
+## Support
+
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=teriansilva.olcr">📦 Marketplace</a> •
+  <a href="https://github.com/teriansilva/azure-devops-ollama-code-reviewer/issues/new?labels=bug">🐛 Report Bug</a> •
+  <a href="https://github.com/teriansilva/azure-devops-ollama-code-reviewer/issues/new?labels=enhancement">💡 Feature Request</a> •
+  <a href="https://buymeacoffee.com/teriansilva">☕ Buy Me a Coffee</a>
+</p>
+
+---
+
+<p align="center">Made with ❤️ for the Azure DevOps community</p>

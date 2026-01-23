@@ -146,12 +146,16 @@ export class Ollama {
                 } catch (err: any) {
                     this._apiClient.log(`Error fetching ${filePath}: ${err.message}`);
                 }
+            } else {
+                tl.warning(`Unable to process file ${fileName} as it exceeds token limit (${tokenLimit}) even with diff only (${diffOnlyTokens} tokens).`);
+                return [];
             }
             
             this._apiClient.log(`Total additional context files: ${additionalContext.size}`);
         } catch (err: any) {
             this._apiClient.log(`Context check pass failed: ${err.message}`);
         }
+    }
 
         return additionalContext;
     }

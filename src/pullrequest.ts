@@ -55,15 +55,13 @@ export class PullRequest {
         });
     }
 
-    public async AddComment(fileName: string, comment: string): Promise<boolean> {
-
-        console.info(`Comment added to ${fileName}`);
+    public async AddComment(fileName: string, comment: string, lineNumber?: number): Promise<boolean> {
 
         if (!fileName.startsWith('/')) {
             fileName = `/${fileName}`;
         }
         
-        let body = {
+        let body: any = {
             comments: [
                 {
                     content: comment,
@@ -81,6 +79,18 @@ export class PullRequest {
                     secondComparingIteration: 2
                 }
             }
+        };
+
+        // Add line position if lineNumber is provided
+        if (lineNumber && lineNumber > 0) {
+            body.threadContext.rightFileStart = {
+                line: lineNumber,
+                offset: 1
+            };
+            body.threadContext.rightFileEnd = {
+                line: lineNumber,
+                offset: 1
+            };
         }
 
         let endpoint = `${this._collectionUri}${this._teamProjectId}/_apis/git/repositories/${this._repositoryName}/pullRequests/${this._pullRequestId}/threads?api-version=7.0`
@@ -95,8 +105,13 @@ export class PullRequest {
             if(response.status == 401) {
                 tl.setResult(tl.TaskResult.Failed, "The Build Service must have 'Contribute to pull requests' access to the repository. See https://stackoverflow.com/a/57985733 for more information");
             }
+            if(response.status == 403) {
+                tl.setResult(tl.TaskResult.Failed, "Access Forbidden. The Build Service must have 'Contribute to pull requests' permission. Go to Project Settings → Repositories → Security and grant this permission to your Build Service account.");
+            }
 
-            tl.warning(response.statusText)
+            tl.warning(`Failed to add comment: ${response.status} ${response.statusText}`)
+        } else {
+            console.info(`Comment added to ${fileName}`);
         }
 
         return response.ok;
@@ -157,5 +172,92 @@ export class PullRequest {
         }
 
         return await commentsResponse.json();
+    }
+
+    public async GetPRCommentsContext(): Promise<string> {
+        try {
+            let context = '\n## Existing Pull Request Comments:\n';
+            let hasComments = false;
+            
+            // Get all threads (including those without file context for general PR comments)
+            let threadsEndpoint = `${this._collectionUri}${this._teamProjectId}/_apis/git/repositories/${this._repositoryName}/pullRequests/${this._pullRequestId}/threads?api-version=5.1`;
+            let threadsResponse = await this.httpRequest(threadsEndpoint, {
+                headers: { 'Authorization': `Bearer ${tl.getVariable('System.AccessToken')}`, 'Content-Type': 'application/json' }
+            });
+
+            if (threadsResponse.ok == false) {
+                tl.warning(`Failed to retrieve PR threads: ${threadsResponse.statusText}`);
+                return '';
+            }
+
+            let threads: any = await threadsResponse.json();
+            
+            // Get the build service name to identify AI-generated comments
+            let collectionName = this._collectionUri.replace('https://', '').replace('http://', '').split('/')[1];
+            let buildServiceName = `${tl.getVariable('SYSTEM.TEAMPROJECT')} Build Service (${collectionName})`;
+            
+            for (const thread of threads.value as any[]) {
+                // Skip deleted or resolved threads
+                if (thread.isDeleted) continue;
+                
+                const comments = await this.GetComments(thread);
+                
+                if (!comments.value || comments.value.length === 0) continue;
+                
+                // Include all non-deleted comments with content
+                const validComments = comments.value.filter((comment: any) => 
+                    !comment.isDeleted &&
+                    comment.content && 
+                    comment.content.trim().length > 0 &&
+                    comment.commentType !== 1 // Skip system comments
+                );
+                
+                if (validComments.length === 0) continue;
+                
+                hasComments = true;
+                
+                // Get file context if available
+                const filePath = thread.threadContext?.filePath || 'General PR Comment';
+                const threadStatus = this.getThreadStatusName(thread.status);
+                
+                context += `\n### ${filePath} (Status: ${threadStatus}):\n`;
+                
+                for (const comment of validComments) {
+                    const author = comment.author.displayName || 'Unknown';
+                    const content = comment.content;
+                    const isAIComment = author === buildServiceName;
+                    
+                    if (isAIComment) {
+                        context += `- **[AI - Previous Review]**: ${content}\n`;
+                    } else {
+                        context += `- **${author}**: ${content}\n`;
+                    }
+                }
+            }
+            
+            if (!hasComments) {
+                return '';
+            }
+            
+            context += '\n---\n**IMPORTANT**: Comments marked with [AI - Previous Review] are your own comments from a previous run. DO NOT repeat or rephrase these comments. Only add NEW insights not already covered.\n';
+            
+            return context;
+        } catch (error) {
+            tl.warning(`Could not retrieve PR comments context: ${error}`);
+            return '';
+        }
+    }
+
+    private getThreadStatusName(status: number): string {
+        switch (status) {
+            case 0: return 'Unknown';
+            case 1: return 'Active';
+            case 2: return 'Fixed';
+            case 3: return 'Won\'t Fix';
+            case 4: return 'Closed';
+            case 5: return 'By Design';
+            case 6: return 'Pending';
+            default: return 'Unknown';
+        }
     }
 }
