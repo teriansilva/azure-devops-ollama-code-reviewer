@@ -1,393 +1,243 @@
-import tl = require('azure-pipelines-task-lib/task');
-import { encode } from 'gpt-tokenizer';
-import https = require('https');
-import http = require('http');
+import { ReviewConfig, FileContentFetcher } from './types';
+import { PromptBuilder } from './prompts';
+import { OllamaApiClient } from './api-client';
 
-export interface CodeReviewComment {
-    lineNumber: number;
-    comment: string;
-}
+// Re-export types for backward compatibility
+export { ReviewConfig, FileContentFetcher } from './types';
 
-interface OllamaMessage {
-    role: string;
-    content: string;
-}
-
-interface OllamaRequest {
-    model: string;
-    messages: OllamaMessage[];
-    stream: boolean;
-}
-
-interface OllamaResponse {
-    // Ollama native format
-    message?: {
-        role: string;
-        content: string;
-    };
-    done?: boolean;
-    // OpenAI-compatible format
-    choices?: Array<{
-        index: number;
-        message: {
-            role: string;
-            content: string;
-        };
-        finishReason?: string;
-    }>;
-}
+// ============================================================================
+// OLLAMA ORCHESTRATOR - Main review workflow
+// ============================================================================
 
 export class Ollama {
-    private readonly systemMessage: string = '';
-    private readonly ollamaEndpoint: string;
-    private readonly useHttps: boolean;
-    private readonly bearerToken?: string;
-    private readonly projectContext: string = '';
+    private _apiClient: OllamaApiClient;
+    private _config: ReviewConfig;
+    private _fileFetcher: FileContentFetcher | null = null;
 
     constructor(
-        ollamaEndpoint: string,
-        checkForBugs: boolean = false,
-        checkForPerformance: boolean = false,
-        checkForBestPractices: boolean = false,
-        additionalPrompts: string[] = [],
-        customBestPractices: string = '',
-        projectContext: string = '',
-        bearerToken?: string,
-        customSystemPrompt?: string
+        endpoint: string,
+        model: string,
+        config: ReviewConfig,
+        bearerToken?: string
     ) {
-        this.ollamaEndpoint = ollamaEndpoint;
-        this.useHttps = ollamaEndpoint.startsWith('https://');
-        this.bearerToken = bearerToken;
-        this.projectContext = projectContext;
+        this._config = config;
         
-        // Parse custom best practices into array
-        const customPracticesArray = customBestPractices 
-            ? customBestPractices.split('\n').filter(line => line.trim().length > 0).map(line => line.trim())
-            : [];
-        
-        // Use custom system prompt if provided, otherwise build the default one
-        if (customSystemPrompt && customSystemPrompt.trim().length > 0) {
-            this.systemMessage = customSystemPrompt.trim();
-            console.log('Using custom system prompt');
-        } else {
-            this.systemMessage = `Your task is to act as a code reviewer of a Pull Request.
-        ${checkForBugs ? '- If there are any bugs, highlight them.' : ''}
-        ${checkForPerformance ? '- If there are major performance problems, highlight them.' : ''}
-        ${checkForBestPractices ? '- Provide details on missed use of best-practices.' : ''}
-        ${additionalPrompts.length > 0 ? additionalPrompts.map(str => `- ${str}`).join('\n        ') : ''}
-        ${customPracticesArray.length > 0 ? `\n        Additionally, check for the following project-specific best practices:\n        ${customPracticesArray.map(str => `- ${str}`).join('\n        ')}` : ''}
-        - Do not highlight minor issues and nitpicks.
-        - Only provide instructions for improvements.
-        - If you have no comments, respond with exactly: {"comments": []}
-    
-        You will be provided with:
-        1. The CURRENT file content (after changes, for full context)
-        2. The code changes (diffs) in unidiff format - this shows what was added/removed
-        3. Project metadata (README, dependencies, etc.)
-        4. Build log context from previous pipeline steps (if enabled)
-        5. Existing PR comments from human reviewers (if enabled)
-        
-        The diff shows: lines starting with '+' are ADDED, lines starting with '-' are REMOVED.
-        Focus your review on the changes shown in the diff. Use the full file content to understand the complete context.
-        If build logs show that the project builds successfully, consider this when reviewing changes.
-        If build logs show errors or warnings, consider whether the changes address or relate to those issues.
-        If existing PR comments are provided:
-        - Comments marked with [AI - Previous Review] are YOUR OWN comments from a previous run. DO NOT repeat, rephrase, or duplicate these comments under any circumstances.
-        - For comments from human reviewers, avoid duplicating their points.
-        - Only provide NEW insights that have not already been covered by any existing comments.
-        
-        **IMPORTANT: Your response MUST be valid JSON in the following format:**
-        {
-          "comments": [
-            {
-              "lineNumber": <number - the line number in the NEW/modified file where this comment applies>,
-              "comment": "<string - your review comment in markdown format>"
-            }
-          ]
-        }
-        
-        Rules for lineNumber:
-        - Use the line number from the NEW version of the file (after changes)
-        - The line number should point to the specific line of code your comment is about
-        - For multi-line issues, use the starting line number
-        - Only comment on lines that are part of the changes (added or modified lines from the diff)
-        
-        Example response:
-        {
-          "comments": [
-            {
-              "lineNumber": 42,
-              "comment": "**Potential Bug**: This variable is used before being initialized. Consider adding a null check."
-            },
-            {
-              "lineNumber": 87,
-              "comment": "**Performance**: This loop could be optimized by using a Set instead of an Array for lookups."
-            }
-          ]
-        }`;
-        }
-    }
-
-    private countTokens(text: string): number {
-        try {
-            return encode(text).length;
-        } catch (error) {
-            // Fallback: estimate ~4 characters per token
-            return Math.ceil(text.length / 4);
-        }
-    }
-
-    private truncateToTokenLimit(text: string, maxTokens: number, label: string): string {
-        if (maxTokens <= 0) {
-            return '';
-        }
-        
-        const currentTokens = this.countTokens(text);
-        if (currentTokens <= maxTokens) {
-            return text;
-        }
-        
-        // Estimate character ratio and truncate
-        const ratio = maxTokens / currentTokens;
-        const targetLength = Math.floor(text.length * ratio * 0.95); // 5% buffer
-        const truncated = text.substring(0, targetLength) + '\n\n[... truncated due to token limit ...]';
-        
-        console.log(`${label}: Truncated from ${currentTokens} to ~${maxTokens} tokens`);
-        return truncated;
-    }
-
-    public async PerformCodeReview(diff: string, fileName: string, fileContent: string = ''): Promise<CodeReviewComment[]> {
-        const model = tl.getInput('ai_model', true)!;
-        
-        // Get configurable limits
-        const tokenLimitStr = tl.getInput('token_limit', false) || '8192';
-        const tokenLimit = parseInt(tokenLimitStr, 10) || 8192;
-        
-        const maxFileContentTokensStr = tl.getInput('max_file_content_tokens', false) || '4000';
-        const maxFileContentTokens = parseInt(maxFileContentTokensStr, 10) || 4000;
-        
-        const maxProjectContextTokensStr = tl.getInput('max_project_context_tokens', false) || '2000';
-        const maxProjectContextTokens = parseInt(maxProjectContextTokensStr, 10) || 2000;
-
-        // Truncate project context if needed
-        const truncatedProjectContext = this.truncateToTokenLimit(
-            this.projectContext, 
-            maxProjectContextTokens, 
-            'Project Context'
+        this._apiClient = new OllamaApiClient(
+            endpoint, 
+            model, 
+            config.tokenLimit, 
+            config.debug,
+            bearerToken
         );
-        
-        // Truncate file content if needed
-        const truncatedFileContent = this.truncateToTokenLimit(
-            fileContent, 
-            maxFileContentTokens, 
-            `File Content (${fileName})`
-        );
+    }
 
-        // Construct the full context message
-        let contextMessage = '';
-        
-        if (truncatedProjectContext) {
-            contextMessage += `${truncatedProjectContext}\n\n`;
-        }
-        
-        if (truncatedFileContent) {
-            contextMessage += `## Current File Content (${fileName}):\n\`\`\`\n${truncatedFileContent}\n\`\`\`\n\n`;
-        }
-        
-        contextMessage += `## Changes (Diff):\n\`\`\`diff\n${diff}\n\`\`\`\n\n`;
-        contextMessage += `Please review the changes in the diff above. Lines with '+' are additions, lines with '-' are removals. Use the full file content for context. Remember to respond with valid JSON only.`;
+    /**
+     * Set the file fetcher for agentic context requests
+     */
+    setFileFetcher(fetcher: FileContentFetcher): void {
+        this._fileFetcher = fetcher;
+    }
 
-        // Calculate and log token counts for transparency
-        const systemMessageTokens = this.countTokens(this.systemMessage);
-        const contextMessageTokens = this.countTokens(contextMessage);
-        const diffTokens = this.countTokens(diff);
-        const totalTokens = systemMessageTokens + contextMessageTokens;
+    /**
+     * Main entry point: Review a file
+     * Uses multi-pass workflow if enabled, otherwise single review pass
+     */
+    async PerformCodeReview(diff: string, fileName: string, fileContent: string): Promise<string> {
+        // Check if multi-pass is enabled (default: true)
+        const multipassEnabled = this._config.enableMultipass !== false;
         
-        console.log(`Token breakdown for ${fileName}:`);
-        console.log(`  - System Message: ${systemMessageTokens} tokens`);
-        console.log(`  - Context Message: ${contextMessageTokens} tokens`);
-        console.log(`    (includes project context, file content, diff)`);
-        console.log(`  - Diff only: ${diffTokens} tokens`);
-        console.log(`  - Total: ${totalTokens} tokens (limit: ${tokenLimit})`);
-
-        // Check token limit with full context
-        if (totalTokens <= tokenLimit) {
-            try {
-                console.log(`Proceeding with full context review for ${fileName}`);
-                const response = await this.callOllamaApi(model, contextMessage);
-                
-                if (response && response.message && response.message.content) {
-                    console.log(`Ollama API response received for ${fileName}: ${response.message.content.substring(0, 200)}...`);
-                    return this.parseCodeReviewResponse(response.message.content);
-                } else if (response && response.choices && response.choices.length > 0 && response.choices[0].message && response.choices[0].message.content) {
-                    // OpenAI-compatible format
-                    const content = response.choices[0].message.content;
-                    console.log(`OpenAI-compatible API response received for ${fileName}: ${content.substring(0, 200)}...`);
-                    return this.parseCodeReviewResponse(content);
-                } else {
-                    console.log(`Raw Ollama API response for ${fileName}: ${JSON.stringify(response)}`);
-                    tl.warning(`Empty or invalid response from Ollama API for ${fileName}`);
-                    return [];
-                }
-            } catch (error) {
-                tl.error(`Error calling Ollama API for file ${fileName}: ${error}`);
-                return [];
-            }
-        } else {
-            // If full context exceeds limits, try with just diff
-            const diffOnlyTokens = systemMessageTokens + diffTokens;
-            tl.warning(`Full context for ${fileName} exceeds token limit (${totalTokens} > ${tokenLimit}). Attempting review with diff only (${diffOnlyTokens} tokens).`);
+        if (multipassEnabled) {
+            this._apiClient.log(`Starting 4-pass review for: ${fileName}`);
             
-            if (diffOnlyTokens <= tokenLimit) {
+            // Pass 1: Context check
+            const additionalContext = await this.executeContextCheckPass(fileName, fileContent, diff);
+            
+            // Pass 2: Generate review
+            const review = await this.executeReviewPass(fileName, fileContent, diff, additionalContext);
+            
+            if (review === 'NO_COMMENT' || review.trim().toUpperCase() === 'NO_COMMENT') {
+                this._apiClient.log('No issues found in review pass');
+                return 'NO_COMMENT';
+            }
+            
+            // Pass 3: Format review
+            const formattedReview = await this.executeFormatPass(review);
+            
+            if (formattedReview === 'NO_COMMENT' || formattedReview.trim().toUpperCase() === 'NO_COMMENT') {
+                this._apiClient.log('No issues after format pass');
+                return 'NO_COMMENT';
+            }
+            
+            // Pass 4: Verify review accuracy
+            const verifiedReview = await this.executeVerifyPass(fileName, fileContent, diff, formattedReview);
+            
+            return verifiedReview;
+        } else {
+            // Single-pass mode: just run review pass
+            this._apiClient.log(`Starting single-pass review for: ${fileName}`);
+            
+            const review = await this.executeReviewPass(fileName, fileContent, diff, new Map());
+            
+            if (review === 'NO_COMMENT' || review.trim().toUpperCase() === 'NO_COMMENT') {
+                return 'NO_COMMENT';
+            }
+            
+            return review;
+        }
+    }
+
+    // ========================================================================
+    // PASS 1: Context Check
+    // ========================================================================
+
+    private async executeContextCheckPass(
+        fileName: string, 
+        fileContent: string, 
+        diff: string
+    ): Promise<Map<string, string>> {
+        const additionalContext = new Map<string, string>();
+        
+        // Skip if no file fetcher available
+        if (!this._fileFetcher) {
+            this._apiClient.log('No file fetcher available, skipping context check');
+            return additionalContext;
+        }
+
+        // Skip for config files
+        if (this.isConfigFile(fileName)) {
+            this._apiClient.log('Skipping context check for config file');
+            return additionalContext;
+        }
+
+        this._apiClient.log('PASS 1: Checking if additional context needed');
+
+        try {
+            const systemPrompt = PromptBuilder.buildContextCheckSystemPrompt(this._config.pass1Prompt);
+            const userMessage = PromptBuilder.buildReviewUserMessage(fileName, fileContent, diff);
+            
+            const response = await this._apiClient.callApi(systemPrompt, userMessage, this._config.pass1Model);
+            this._apiClient.log(`Context check response: ${response.substring(0, 200)}`);
+            
+            // Check if READY
+            if (response.trim().toUpperCase().startsWith('READY')) {
+                this._apiClient.log('AI says READY - no additional context needed');
+                return additionalContext;
+            }
+            
+            // Parse file requests
+            const requestedFiles = PromptBuilder.parseContextRequest(response);
+            if (!requestedFiles || requestedFiles.length === 0) {
+                this._apiClient.log('No context request parsed');
+                return additionalContext;
+            }
+            
+            this._apiClient.log(`AI requested files: ${requestedFiles.join(', ')}`);
+            
+            // Fetch requested files
+            for (const filePath of requestedFiles) {
                 try {
-                    console.log(`Proceeding with diff-only review for ${fileName}`);
-                    const diffOnlyMessage = `## Changes (Diff):\n\`\`\`diff\n${diff}\n\`\`\`\n\nPlease review the changes in the diff above. Remember to respond with valid JSON only.`;
-                    const response = await this.callOllamaApi(model, diffOnlyMessage);
-                    
-                    if (response && response.message && response.message.content) {
-                        console.log(`Ollama API response received for ${fileName}: ${response.message.content.substring(0, 200)}...`);
-                        return this.parseCodeReviewResponse(response.message.content);
-                    } else if (response && response.choices && response.choices.length > 0 && response.choices[0].message && response.choices[0].message.content) {
-                        // OpenAI-compatible format
-                        const content = response.choices[0].message.content;
-                        console.log(`OpenAI-compatible API response received for ${fileName}: ${content.substring(0, 200)}...`);
-                        return this.parseCodeReviewResponse(content);
+                    const content = await this._fileFetcher(filePath);
+                    if (content && !content.startsWith('Error:') && !content.startsWith('File not found')) {
+                        additionalContext.set(filePath, content);
+                        this._apiClient.log(`Fetched: ${filePath} (${content.length} chars)`);
                     } else {
-                        console.log(`Raw Ollama API response for ${fileName}: ${JSON.stringify(response)}`);
-                        tl.warning(`Empty or invalid response from Ollama API for ${fileName} (diff-only mode)`);
-                        return [];
+                        this._apiClient.log(`Could not fetch: ${filePath} - ${content?.substring(0, 100)}`);
                     }
-                } catch (error) {
-                    tl.error(`Error calling Ollama API for file ${fileName}: ${error}`);
-                    return [];
+                } catch (err: any) {
+                    this._apiClient.log(`Error fetching ${filePath}: ${err.message}`);
                 }
             } else {
                 tl.warning(`Unable to process file ${fileName} as it exceeds token limit (${tokenLimit}) even with diff only (${diffOnlyTokens} tokens).`);
                 return [];
             }
+            
+            this._apiClient.log(`Total additional context files: ${additionalContext.size}`);
+        } catch (err: any) {
+            this._apiClient.log(`Context check pass failed: ${err.message}`);
         }
     }
 
-    private parseCodeReviewResponse(content: string): CodeReviewComment[] {
-        try {
-            // Try to extract JSON from the response
-            let jsonContent = content.trim();
-            
-            // Handle cases where the model wraps JSON in markdown code blocks
-            const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (jsonMatch) {
-                jsonContent = jsonMatch[1].trim();
-            }
-            
-            const parsed = JSON.parse(jsonContent);
-            
-            if (parsed.comments && Array.isArray(parsed.comments)) {
-                return parsed.comments.filter((c: any) => 
-                    typeof c.lineNumber === 'number' && 
-                    typeof c.comment === 'string' &&
-                    c.comment.trim().length > 0
-                ).map((c: any) => ({
-                    lineNumber: c.lineNumber,
-                    comment: c.comment
-                }));
-            }
-            
-            return [];
-        } catch (error) {
-            tl.warning(`Failed to parse AI response as JSON: ${error}. Response: ${content.substring(0, 200)}...`);
-            
-            // Fallback: if the response is not valid JSON but contains content,
-            // return it as a single comment at line 1
-            if (content && content.trim().length > 0 && !content.includes('{"comments": []}')) {
-                return [{
-                    lineNumber: 1,
-                    comment: content
-                }];
-            }
-            
-            return [];
-        }
+        return additionalContext;
     }
 
-    private async callOllamaApi(model: string, diff: string): Promise<OllamaResponse> {
-        return new Promise((resolve, reject) => {
-            const url = new URL(this.ollamaEndpoint);
-            const protocol = this.useHttps ? https : http;
-            
-            const requestData: OllamaRequest = {
-                model: model,
-                messages: [
-                    {
-                        role: 'system',
-                        content: this.systemMessage
-                    },
-                    {
-                        role: 'user',
-                        content: diff
-                    }
-                ],
-                stream: false
-            };
+    // ========================================================================
+    // PASS 2: Review
+    // ========================================================================
 
-            const postData = JSON.stringify(requestData);
-
-            const headers: any = {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(postData)
-            };
-
-            // Add Bearer token if provided
-            if (this.bearerToken) {
-                headers['Authorization'] = `Bearer ${this.bearerToken}`;
-            }
-
-            const options = {
-                hostname: url.hostname,
-                port: url.port || (this.useHttps ? 443 : 80),
-                path: url.pathname,
-                method: 'POST',
-                headers: headers
-            };
-
-            const req = protocol.request(options, (res) => {
-                let data = '';
-
-                res.on('data', (chunk) => {
-                    data += chunk;
-                });
-
-                res.on('end', () => {
-                    try {
-                        if (res.statusCode === 200) {
-                            const response: OllamaResponse = JSON.parse(data);
-                            resolve(response);
-                        } else {
-                            // Log the full error response for debugging
-                            console.error(`Ollama API error response (${res.statusCode}): ${data.substring(0, 500)}`);
-                            reject(new Error(`Ollama API returned status code ${res.statusCode}: ${data.substring(0, 200)}`));
-                        }
-                    } catch (error) {
-                        reject(new Error(`Failed to parse Ollama response: ${error}`));
-                    }
-                });
-            });
-
-            req.on('error', (error) => {
-                reject(error);
-            });
-
-            req.write(postData);
-            req.end();
-        });
+    private async executeReviewPass(
+        fileName: string, 
+        fileContent: string, 
+        diff: string,
+        additionalContext: Map<string, string>
+    ): Promise<string> {
+        this._apiClient.log('PASS 2: Generating review');
+        
+        const systemPrompt = PromptBuilder.buildReviewSystemPrompt(this._config, this._config.pass2Prompt);
+        
+        // Build user message with or without additional context
+        let userMessage: string;
+        if (additionalContext.size > 0) {
+            userMessage = PromptBuilder.buildEnrichedUserMessage(fileName, fileContent, diff, additionalContext);
+        } else {
+            userMessage = PromptBuilder.buildReviewUserMessage(fileName, fileContent, diff);
+        }
+        
+        // Check token limit
+        const fullContent = systemPrompt + userMessage;
+        if (this._apiClient.exceedsTokenLimit(fullContent)) {
+            this._apiClient.log('Content exceeds token limit, using diff only');
+            userMessage = PromptBuilder.buildDiffOnlyUserMessage(fileName, diff);
+        }
+        
+        const review = await this._apiClient.callApi(systemPrompt, userMessage, this._config.pass2Model);
+        this._apiClient.log(`Review generated: ${review.length} chars`);
+        
+        return review;
     }
 
-    private doesMessageExceedTokenLimit(message: string, tokenLimit: number): boolean {
-        try {
-            const tokens = encode(message);
-            return tokens.length > tokenLimit;
-        } catch (error) {
-            tl.warning(`Token encoding failed: ${error}. Proceeding with review.`);
-            return false;
-        }
+    // ========================================================================
+    // PASS 3: Format
+    // ========================================================================
+
+    private async executeFormatPass(review: string): Promise<string> {
+        this._apiClient.log('PASS 3: Formatting review');
+        
+        const systemPrompt = PromptBuilder.buildFormatSystemPrompt(this._config.pass3Prompt);
+        const userMessage = PromptBuilder.buildFormatUserMessage(review);
+        
+        const formattedReview = await this._apiClient.callApi(systemPrompt, userMessage, this._config.pass3Model);
+        this._apiClient.log(`Formatted review: ${formattedReview.length} chars`);
+        
+        return formattedReview;
+    }
+
+    // ========================================================================
+    // PASS 4: Verify
+    // ========================================================================
+
+    private async executeVerifyPass(
+        fileName: string, 
+        fileContent: string, 
+        diff: string, 
+        review: string
+    ): Promise<string> {
+        this._apiClient.log('PASS 4: Verifying review');
+        
+        const systemPrompt = PromptBuilder.buildVerifySystemPrompt(this._config.pass4Prompt);
+        const userMessage = PromptBuilder.buildVerifyUserMessage(fileName, fileContent, diff, review);
+        
+        const verifiedReview = await this._apiClient.callApi(systemPrompt, userMessage, this._config.pass4Model);
+        this._apiClient.log(`Verified review: ${verifiedReview.length} chars`);
+        
+        return verifiedReview;
+    }
+
+    // ========================================================================
+    // HELPERS
+    // ========================================================================
+
+    private isConfigFile(fileName: string): boolean {
+        const configExtensions = ['.json', '.yaml', '.yml', '.xml', '.config', '.csproj', '.sln'];
+        return configExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
     }
 }
