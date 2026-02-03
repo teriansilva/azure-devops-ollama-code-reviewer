@@ -47,6 +47,23 @@ export class Repository {
         return diff;
     }
 
+    /**
+     * Get the file content from the target branch (the OLD version before changes)
+     * This returns what the file looked like before the PR changes
+     */
+    public async GetOldFileContent(fileName: string): Promise<string> {
+        try {
+            let targetBranch = this.GetTargetBranch();
+            // Use git show to get file content from the target branch
+            const content = await this._repository.show([`${targetBranch}:${fileName}`]);
+            return content;
+        } catch (error) {
+            // File didn't exist in target branch (new file)
+            console.log(`[DEBUG] File ${fileName} not found in target branch (likely a new file)`);
+            return '';
+        }
+    }
+
     public async GetFileContent(fileName: string): Promise<string> {
         const fs = require('fs');
         const path = require('path');

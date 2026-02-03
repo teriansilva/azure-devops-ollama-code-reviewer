@@ -42,7 +42,7 @@ export class Ollama {
      * Main entry point: Review a file
      * Uses multi-pass workflow if enabled, otherwise single review pass
      */
-    async PerformCodeReview(diff: string, fileName: string, fileContent: string): Promise<string> {
+    async PerformCodeReview(diff: string, fileName: string, fileContent: string, oldFileContent?: string): Promise<string> {
         // Check if multi-pass is enabled (default: true)
         const multipassEnabled = this._config.enableMultipass !== false;
         
@@ -50,10 +50,10 @@ export class Ollama {
             this._apiClient.log(`Starting 4-pass review for: ${fileName}`);
             
             // Pass 1: Context check
-            const additionalContext = await this.executeContextCheckPass(fileName, fileContent, diff);
+            const additionalContext = await this.executeContextCheckPass(fileName, fileContent, diff, oldFileContent);
             
             // Pass 2: Generate review
-            const review = await this.executeReviewPass(fileName, fileContent, diff, additionalContext);
+            const review = await this.executeReviewPass(fileName, fileContent, diff, additionalContext, oldFileContent);
             
             if (review === 'NO_COMMENT' || review.trim().toUpperCase() === 'NO_COMMENT') {
                 this._apiClient.log('No issues found in review pass');
@@ -69,14 +69,14 @@ export class Ollama {
             }
             
             // Pass 4: Verify review accuracy
-            const verifiedReview = await this.executeVerifyPass(fileName, fileContent, diff, formattedReview);
+            const verifiedReview = await this.executeVerifyPass(fileName, fileContent, diff, formattedReview, oldFileContent);
             
             return verifiedReview;
         } else {
             // Single-pass mode: just run review pass
             this._apiClient.log(`Starting single-pass review for: ${fileName}`);
             
-            const review = await this.executeReviewPass(fileName, fileContent, diff, new Map());
+            const review = await this.executeReviewPass(fileName, fileContent, diff, new Map(), oldFileContent);
             
             if (review === 'NO_COMMENT' || review.trim().toUpperCase() === 'NO_COMMENT') {
                 return 'NO_COMMENT';
@@ -93,7 +93,8 @@ export class Ollama {
     private async executeContextCheckPass(
         fileName: string, 
         fileContent: string, 
-        diff: string
+        diff: string,
+        oldFileContent?: string
     ): Promise<Map<string, string>> {
         const additionalContext = new Map<string, string>();
         
@@ -113,7 +114,7 @@ export class Ollama {
 
         try {
             const systemPrompt = PromptBuilder.buildContextCheckSystemPrompt(this._config.pass1Prompt);
-            const userMessage = PromptBuilder.buildReviewUserMessage(fileName, fileContent, diff);
+            const userMessage = PromptBuilder.buildReviewUserMessage(fileName, fileContent, diff, oldFileContent);
             
             const response = await this._apiClient.callApi(systemPrompt, userMessage, this._config.pass1Model);
             this._apiClient.log(`Context check response: ${response.substring(0, 200)}`);
@@ -146,16 +147,12 @@ export class Ollama {
                 } catch (err: any) {
                     this._apiClient.log(`Error fetching ${filePath}: ${err.message}`);
                 }
-            } else {
-                tl.warning(`Unable to process file ${fileName} as it exceeds token limit (${tokenLimit}) even with diff only (${diffOnlyTokens} tokens).`);
-                return [];
             }
             
             this._apiClient.log(`Total additional context files: ${additionalContext.size}`);
         } catch (err: any) {
             this._apiClient.log(`Context check pass failed: ${err.message}`);
         }
-    }
 
         return additionalContext;
     }
@@ -168,7 +165,8 @@ export class Ollama {
         fileName: string, 
         fileContent: string, 
         diff: string,
-        additionalContext: Map<string, string>
+        additionalContext: Map<string, string>,
+        oldFileContent?: string
     ): Promise<string> {
         this._apiClient.log('PASS 2: Generating review');
         
@@ -177,9 +175,9 @@ export class Ollama {
         // Build user message with or without additional context
         let userMessage: string;
         if (additionalContext.size > 0) {
-            userMessage = PromptBuilder.buildEnrichedUserMessage(fileName, fileContent, diff, additionalContext);
+            userMessage = PromptBuilder.buildEnrichedUserMessage(fileName, fileContent, diff, additionalContext, oldFileContent);
         } else {
-            userMessage = PromptBuilder.buildReviewUserMessage(fileName, fileContent, diff);
+            userMessage = PromptBuilder.buildReviewUserMessage(fileName, fileContent, diff, oldFileContent);
         }
         
         // Check token limit
@@ -219,12 +217,13 @@ export class Ollama {
         fileName: string, 
         fileContent: string, 
         diff: string, 
-        review: string
+        review: string,
+        oldFileContent?: string
     ): Promise<string> {
         this._apiClient.log('PASS 4: Verifying review');
         
         const systemPrompt = PromptBuilder.buildVerifySystemPrompt(this._config.pass4Prompt);
-        const userMessage = PromptBuilder.buildVerifyUserMessage(fileName, fileContent, diff, review);
+        const userMessage = PromptBuilder.buildVerifyUserMessage(fileName, fileContent, diff, review, oldFileContent);
         
         const verifiedReview = await this._apiClient.callApi(systemPrompt, userMessage, this._config.pass4Model);
         this._apiClient.log(`Verified review: ${verifiedReview.length} chars`);

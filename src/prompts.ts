@@ -81,22 +81,28 @@ Do not provide any review yet. Just indicate if you need more context.`;
 
         return `You are a code reviewer. You will review exactly ONE file at a time.
 ${projectInfo}
-CRITICAL: You are reviewing ONLY the file provided below. Do NOT reference, assume, or comment on any other files. If you cannot see code in the provided content, do not comment on it.
+CRITICAL: You are reviewing ONLY the file provided below. Do NOT reference, assume, or comment on any other files.
 
-The changes are provided in two sections:
-- "REMOVED" = old code that NO LONGER EXISTS (was deleted)
-- "ADDED" = new code that NOW EXISTS (was added) - FOCUS YOUR REVIEW HERE
+You will receive THREE sections for each file:
+1. "OLD FILE (BEFORE CHANGES)" - The complete file BEFORE the changes were made
+2. "NEW FILE (AFTER CHANGES)" - The complete file AFTER the changes - THIS IS THE CURRENT STATE
+3. "DIFF SUMMARY" - A summary of what lines were removed and added
 
-Only the ADDED code exists in the current file. The REMOVED code is gone.
+IMPORTANT:
+- The NEW FILE section shows the COMPLETE, VALID file as it exists now
+- Do NOT assume syntax errors based on the diff alone - always verify against the NEW FILE
+- The diff may show incomplete code snippets, but the NEW FILE is the source of truth
+- Focus your review on changes introduced (visible in the diff) but verify issues in the NEW FILE
 
 Look for:
 ${criteria}
 
 Rules:
-- Focus on the ADDED code section - this is what's being introduced
-- Do not report issues in REMOVED code (it no longer exists)
+- Focus on the changes (visible in diff) but verify against the complete NEW FILE
+- Do not report issues that only exist in the OLD FILE (that code is gone)
+- Do not report false syntax issues - check the NEW FILE for complete context
 - Skip config files (JSON/YAML/XML) unless there's a security issue (exposed secrets)
-- If you find no real issues in the ADDED code, respond with NO_COMMENT
+- If you find no real issues in the new code, respond with NO_COMMENT
 
 Response format (if issues found):
 ### Summary
@@ -151,26 +157,30 @@ Respond with the properly formatted review.`;
         }
         
         return `You are a code review validator. You will receive:
-1. A file's content and changes
-2. A formatted review for this file
+1. The OLD FILE (before changes) - for reference
+2. The NEW FILE (after changes) - the current state, source of truth
+3. A DIFF SUMMARY showing what changed
+4. A formatted review for this file
 
-Your job: Verify each issue in the review actually exists in the code.
+Your job: Verify each issue in the review actually exists in the NEW FILE.
 
 ## Validation Checks
 For each issue:
-- Does the issue actually exist in THIS file's ADDED code?
+- Does the issue actually exist in the NEW FILE?
 - Is the problem real (not hallucinated)?
-- Is it about code that EXISTS (not removed/deleted code)?
+- Is it about code that EXISTS in the NEW FILE (not removed/deleted code)?
+- Is the syntax concern valid when looking at the COMPLETE NEW FILE?
 
 ## CRITICAL Rules
 1. DO NOT change the wording, structure, or formatting of valid issues
 2. DO NOT add new issues or modify existing descriptions
 3. DO NOT rephrase the Summary, Problem, or Fix fields
 4. ONLY remove issues that are clearly hallucinated or invalid
-5. If an issue is valid, copy it EXACTLY as written - character for character
-6. Keep the exact same markdown structure and formatting
-7. If ALL issues are valid, return the review UNCHANGED
-8. If NO valid issues remain, respond with: NO_COMMENT
+5. Remove issues about missing brackets/syntax that are actually present in the NEW FILE
+6. If an issue is valid, copy it EXACTLY as written - character for character
+7. Keep the exact same markdown structure and formatting
+8. If ALL issues are valid, return the review UNCHANGED
+9. If NO valid issues remain, respond with: NO_COMMENT
 
 Your ONLY job is to REMOVE invalid issues. Never edit valid ones.
 
@@ -246,27 +256,42 @@ Respond with the validated review (unchanged except for removed invalid issues).
     // ========================================================================
 
     /**
-     * Build user message for review (file content + diff)
+     * Build user message for review (old file, new file, and diff)
      */
-    static buildReviewUserMessage(fileName: string, fileContent: string, diff: string): string {
+    static buildReviewUserMessage(fileName: string, fileContent: string, diff: string, oldFileContent?: string): string {
         const simplifiedDiff = this.simplifyDiff(diff);
-        let message = `File: ${fileName}\n\n`;
+        let message = `## File: ${fileName}\n\n`;
         
-        if (fileContent) {
-            message += `Current File Content:\n\`\`\`\n${fileContent}\n\`\`\`\n\n`;
+        // Section 1: Old file content (before changes)
+        message += `### OLD FILE (BEFORE CHANGES)\n`;
+        if (oldFileContent) {
+            message += `\`\`\`\n${oldFileContent}\n\`\`\`\n\n`;
+        } else {
+            message += `(New file - did not exist before)\n\n`;
         }
         
-        message += `Changes Made:\n${simplifiedDiff}`;
+        // Section 2: New file content (after changes) - the current state
+        message += `### NEW FILE (AFTER CHANGES) - This is the current, complete file\n`;
+        if (fileContent) {
+            message += `\`\`\`\n${fileContent}\n\`\`\`\n\n`;
+        } else {
+            message += `(File was deleted)\n\n`;
+        }
+        
+        // Section 3: Diff summary
+        message += `### DIFF SUMMARY (what changed)\n`;
+        message += `${simplifiedDiff}`;
         
         return message;
     }
 
     /**
      * Build user message for review (diff only, when token limit exceeded)
+     * Note: This fallback lacks full file context, so be extra careful about syntax assumptions
      */
     static buildDiffOnlyUserMessage(fileName: string, diff: string): string {
         const simplifiedDiff = this.simplifyDiff(diff);
-        return `File: ${fileName}\n\nChanges Made:\n${simplifiedDiff}`;
+        return `## File: ${fileName}\n\n**Note: Due to file size, only the diff is shown. Do not assume syntax errors from incomplete snippets.**\n\n### DIFF SUMMARY (what changed)\n${simplifiedDiff}`;
     }
 
     /**
@@ -279,16 +304,32 @@ Respond with the validated review (unchanged except for removed invalid issues).
     /**
      * Build user message for verification pass
      */
-    static buildVerifyUserMessage(fileName: string, fileContent: string, diff: string, review: string): string {
+    static buildVerifyUserMessage(fileName: string, fileContent: string, diff: string, review: string, oldFileContent?: string): string {
         const simplifiedDiff = this.simplifyDiff(diff);
-        let message = `File: ${fileName}\n\n`;
+        let message = `## File: ${fileName}\n\n`;
         
-        if (fileContent) {
-            message += `Current File Content:\n\`\`\`\n${fileContent}\n\`\`\`\n\n`;
+        // Section 1: Old file content
+        message += `### OLD FILE (BEFORE CHANGES)\n`;
+        if (oldFileContent) {
+            message += `\`\`\`\n${oldFileContent}\n\`\`\`\n\n`;
+        } else {
+            message += `(New file - did not exist before)\n\n`;
         }
         
-        message += `Changes Made:\n${simplifiedDiff}\n\n`;
-        message += `---\n\nReview to verify:\n${review}`;
+        // Section 2: New file content (current state)
+        message += `### NEW FILE (AFTER CHANGES) - Source of truth for validation\n`;
+        if (fileContent) {
+            message += `\`\`\`\n${fileContent}\n\`\`\`\n\n`;
+        } else {
+            message += `(File was deleted)\n\n`;
+        }
+        
+        // Section 3: Diff summary
+        message += `### DIFF SUMMARY\n`;
+        message += `${simplifiedDiff}\n\n`;
+        
+        // Section 4: Review to verify
+        message += `---\n\n### REVIEW TO VERIFY\n${review}`;
         
         return message;
     }
@@ -300,17 +341,33 @@ Respond with the validated review (unchanged except for removed invalid issues).
         fileName: string, 
         fileContent: string, 
         diff: string, 
-        additionalContext: Map<string, string>
+        additionalContext: Map<string, string>,
+        oldFileContent?: string
     ): string {
         const simplifiedDiff = this.simplifyDiff(diff);
-        let message = `File: ${fileName}\n\n`;
+        let message = `## File: ${fileName}\n\n`;
         
-        if (fileContent) {
-            message += `Current File Content:\n\`\`\`\n${fileContent}\n\`\`\`\n\n`;
+        // Section 1: Old file content
+        message += `### OLD FILE (BEFORE CHANGES)\n`;
+        if (oldFileContent) {
+            message += `\`\`\`\n${oldFileContent}\n\`\`\`\n\n`;
+        } else {
+            message += `(New file - did not exist before)\n\n`;
         }
         
-        message += `Changes Made:\n${simplifiedDiff}\n\n`;
+        // Section 2: New file content (current state)
+        message += `### NEW FILE (AFTER CHANGES) - This is the current, complete file\n`;
+        if (fileContent) {
+            message += `\`\`\`\n${fileContent}\n\`\`\`\n\n`;
+        } else {
+            message += `(File was deleted)\n\n`;
+        }
         
+        // Section 3: Diff summary
+        message += `### DIFF SUMMARY (what changed)\n`;
+        message += `${simplifiedDiff}\n\n`;
+        
+        // Section 4: Additional context
         if (additionalContext.size > 0) {
             message += `---\n\n## Additional Context (requested files):\n\n`;
             for (const [filePath, content] of additionalContext) {

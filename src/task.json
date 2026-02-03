@@ -8,8 +8,8 @@
     "author": "teriansilva",
     "version": {
         "Major": 2,
-        "Minor": 8,
-        "Patch": 8
+        "Minor": 9,
+        "Patch": 0
     },
     "instanceNameFormat": "Ollama Code Review",
     "groups": [

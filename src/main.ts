@@ -183,9 +183,13 @@ export class Main {
             let diff = await this._repository.GetDiff(fileToReview);
             debug(`Diff length: ${diff.length} characters`);
             
-            debug(`Getting file content for ${fileToReview}...`);
+            debug(`Getting current file content for ${fileToReview}...`);
             let fileContent = await this._repository.GetFileContent(fileToReview);
-            debug(`File content length: ${fileContent.length} characters`);
+            debug(`Current file content length: ${fileContent.length} characters`);
+            
+            debug(`Getting old file content (from target branch) for ${fileToReview}...`);
+            let oldFileContent = await this._repository.GetOldFileContent(fileToReview);
+            debug(`Old file content length: ${oldFileContent.length} characters`);
             
             if (debugEnabled) {
                 console.log(`[DEBUG] Diff preview (first 300 chars):`);
@@ -194,7 +198,7 @@ export class Main {
             }
             
             debug('Calling Ollama API...');
-            let review = await this._ollama.PerformCodeReview(diff, fileToReview, fileContent);
+            let review = await this._ollama.PerformCodeReview(diff, fileToReview, fileContent, oldFileContent);
             
             debug(`Review response length: ${review.length} characters`);
             debug(`Review contains NO_COMMENT: ${review.indexOf('NO_COMMENT') >= 0}`);
